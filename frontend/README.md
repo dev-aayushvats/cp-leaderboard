@@ -2,6 +2,18 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+### Environment Setup
+
+Create a `.env.local` file in the root of the frontend directory with the following:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:5000
+```
+
+Replace `http://localhost:5000` with your backend API URL if different.
+
+### Running the Development Server
+
 First, run the development server:
 
 ```bash

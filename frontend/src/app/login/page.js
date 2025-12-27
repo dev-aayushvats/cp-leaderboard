@@ -3,9 +3,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, ArrowRight, Loader2, KeyRound } from "lucide-react";
 import Link from "next/link";
-import axios from "axios";
 import { useRouter } from "next/navigation";
 import useAuthStore from "@/store/useAuthStore";
+import { sendLoginOTP, loginWithOTP } from "@/utils/api";
 
 export default function Login() {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
-      await axios.post("http://localhost:5000/send-login-otp", { email: formData.email });
+      await sendLoginOTP(formData.email);
       setStep(2);
     } catch (err) {
       setError(err.response?.data?.error || "Failed to send code.");
@@ -46,7 +46,7 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.post("http://localhost:5000/login-with-otp", formData);
+      const res = await loginWithOTP(formData);
       login(res.data.token, res.data.user);
       router.push("/");
     } catch (err) {

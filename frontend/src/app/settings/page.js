@@ -3,9 +3,9 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Building, MapPin, Globe, Save, ArrowLeft, Code2, Terminal, Loader2 } from "lucide-react";
 import Link from "next/link";
-import axios from "axios";
 import useAuthStore from "@/store/useAuthStore";
 import { useRouter } from "next/navigation";
+import { getProfile, updateProfile } from "@/utils/api";
 
 export default function Settings() {
   const { user, token, login } = useAuthStore();
@@ -31,9 +31,7 @@ export default function Settings() {
 
     const fetchProfile = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/profile", {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await getProfile();
         
         // Populate form with fetched data
         setFormData({
@@ -61,11 +59,9 @@ export default function Settings() {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.put("http://localhost:5000/profile", formData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await updateProfile(formData);
       
-      // Update local user state (optional, mainly for username/email)
+      // Update local user state (optional, mainly for username/email) 
       // Note: We don't necessarily store handles in the 'user' object of auth store, 
       // but if you do, update it here.
       alert("Profile & Handles Updated! Rankings will refresh in a few hours.");

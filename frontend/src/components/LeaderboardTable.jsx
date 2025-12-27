@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Filter } from "lucide-react";
-import axios from "axios";
+import { getLeaderboard } from "@/utils/api";
 
 // --- SUB-COMPONENT: Shimmer Header ---
 // Creates the "liquid light" effect over the text
@@ -54,13 +54,7 @@ export default function LeaderboardTable() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Construct Query String dynamically
-        const params = new URLSearchParams();
-        if (filters.institute) params.append("institute", filters.institute);
-        if (filters.country) params.append("country", filters.country);
-        if (filters.state) params.append("state", filters.state);
-
-        const res = await axios.get(`http://localhost:5000/leaderboard/${platform}?${params.toString()}`);
+        const res = await getLeaderboard(platform, filters);
         setData(res.data);
       } catch (err) {
         console.error(err);

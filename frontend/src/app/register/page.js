@@ -2,9 +2,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, Mail, Code2, Terminal, ArrowRight, Loader2, KeyRound } from "lucide-react"; // Add KeyRound
-import axios from "axios";
 import { useRouter } from "next/navigation";
 import useAuthStore from "@/store/useAuthStore";
+import { sendOTP, registerWithOTP } from "@/utils/api";
 
 export default function Register() {
     const router = useRouter();
@@ -30,7 +30,7 @@ export default function Register() {
         e.preventDefault();
         setLoading(true);
         try {
-        await axios.post("http://localhost:5000/send-otp", { email: formData.email });
+        await sendOTP(formData.email);
         setStep(2); // Move to OTP step
         } catch (err) {
         console.error(err);
@@ -45,7 +45,7 @@ export default function Register() {
         e.preventDefault();
         setLoading(true);
         try {
-        const res = await axios.post("http://localhost:5000/register-with-otp", formData);
+        const res = await registerWithOTP(formData);
         login(res.data.token, res.data.user);
         router.push("/");
         } catch (err) {
