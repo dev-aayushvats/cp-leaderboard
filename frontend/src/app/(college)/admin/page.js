@@ -1,10 +1,9 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, ShieldCheck, Users, Search, Ban, RotateCcw, Trash2, BadgeCheck, Save, ChevronLeft, ChevronRight, AlertTriangle,
+  Loader2, ShieldCheck, Users, Search, Ban, RotateCcw, Trash2, BadgeCheck, Save, ChevronLeft, ChevronRight, AlertTriangle,
 } from "lucide-react";
 import useRequireAuth from "@/store/useRequireAuth";
 import {
@@ -14,6 +13,7 @@ import useCollege from "@/utils/useCollege";
 import { DEFAULT_PLATFORMS } from "@/utils/platforms";
 import { DEFAULT_BRAND, HEX, colorProblem, hexToTriplet } from "@/utils/branding";
 import CollegeLogo from "@/components/CollegeLogo";
+import SiteHeader from "@/components/SiteHeader";
 import ImportMembers from "@/components/ImportMembers";
 import { timeAgo } from "@/utils/time";
 
@@ -242,10 +242,12 @@ export default function AdminPage() {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [me, setMe] = useState(null);
+  const [tab, setTab] = useState("members");
 
   // Gate: only college admins may see this page (the API enforces it too).
   useEffect(() => {
@@ -268,6 +270,7 @@ export default function AdminPage() {
       const res = await getAdminUsers({ search: search || undefined, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
       setUsers(res.data.users);
       setTotal(res.data.total);
+      setUsersLoaded(true);
     } catch (err) {
       setError(errMsg(err, "Failed to load members"));
     }
@@ -325,14 +328,10 @@ export default function AdminPage() {
   return (
     <main className="min-h-screen bg-dark-bg text-gray-200 font-mono p-4 md:p-8 relative">
       <div className="max-w-5xl mx-auto space-y-8">
-        <div>
-          <Link href="/" className="inline-flex items-center text-xs text-gray-500 hover:text-white mb-4 transition-colors">
-            <ArrowLeft className="w-3 h-3 mr-1" /> Back to Leaderboard
-          </Link>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-pastel-green" /> Admin Panel
-          </h1>
-        </div>
+        <SiteHeader back />
+        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <ShieldCheck className="w-6 h-6 text-pastel-green" /> Admin Panel
+        </h1>
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-lg px-4 py-3" role="alert">{error}</div>
@@ -350,36 +349,93 @@ export default function AdminPage() {
           />
         </section>
 
-        {/* College settings */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-bold text-white/50 uppercase tracking-widest">College settings</h2>
-          <CollegeSettings onError={setError} onSaved={() => router.refresh()} />
-        </section>
+        {/* Tabs */}
+        <div role="tablist" className="flex overflow-x-auto bg-white/5 p-1 rounded-lg border border-white/5 [scrollbar-width:none]">
+          {[["members", `Members${stats ? ` (${stats.members.total})` : ""}`], ["settings", "Settings"], ["import", "Import"]].map(([id, text]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={`flex-1 md:flex-none whitespace-nowrap px-5 py-2 rounded-md text-sm font-bold transition-colors ${tab === id ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
 
-        {/* Import */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-bold text-white/50 uppercase tracking-widest">Import members</h2>
-          <ImportMembers platforms={platformList} onImported={() => { loadUsers(); loadStats(); }} />
-        </section>
+        {tab === "settings" && <CollegeSettings onError={setError} onSaved={() => router.refresh()} />}
 
-        {/* Members */}
+        {tab === "import" && <ImportMembers platforms={platformList} onImported={() => { loadUsers(); loadStats(); }} />}
+
+        {tab === "members" && (
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-xs font-bold text-white/50 uppercase tracking-widest flex items-center gap-2">
               <Users className="w-4 h-4" /> Members ({total})
             </h2>
-            <div className="relative">
+            <div className="relative w-full md:w-auto">
               <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-500" />
               <input
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(0); }}
                 placeholder="Search name or email..."
-                className="bg-dark-bg/50 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-xs text-gray-200 focus:border-white/30 focus:outline-none w-64"
+                className="bg-dark-bg/50 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-xs text-gray-200 focus:border-white/30 focus:outline-none w-full md:w-64"
               />
             </div>
           </div>
 
-          <div className="border border-white/10 rounded-xl overflow-x-auto">
+          {/* Phones: one card per member */}
+          <div className="md:hidden space-y-3">
+            {users.map((u) => {
+              const isMe = u.email === me;
+              const busy = busyId === u.user_id;
+              return (
+                <div key={u.user_id} className="border border-white/10 rounded-xl p-4 bg-white/[0.02] space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-bold text-gray-200 text-sm truncate">
+                        {u.username}
+                        {u.role === "college_admin" && <span className="ml-2 text-[9px] text-pastel-green border border-pastel-green/30 rounded px-1">ADMIN</span>}
+                      </div>
+                      <div className="text-[11px] text-gray-500 truncate">{u.email}</div>
+                      {(u.department || u.batch) && (
+                        <div className="text-[10px] text-gray-600 mt-0.5">{[u.department, u.batch && `Batch ${u.batch}`].filter(Boolean).join(" · ")}</div>
+                      )}
+                    </div>
+                    <span className={`text-[11px] shrink-0 ${u.is_active ? "text-pastel-green" : "text-red-400"}`}>{u.is_active ? "Active" : "Suspended"}</span>
+                  </div>
+                  <dl className="grid grid-cols-3 gap-2 text-[11px]">
+                    {platformList.map((p) => (
+                      <div key={p.id}>
+                        <dt className="text-[9px] text-gray-500 uppercase tracking-widest">{p.label}</dt>
+                        <dd className="text-gray-300 truncate"><Handle info={u.handles?.[p.id]} /></dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {isMe ? (
+                    <p className="text-[11px] text-gray-600">This is you</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      <button disabled={busy} onClick={() => toggleRole(u)} className={`${btn} border-white/10 text-gray-300 hover:border-white/30`}>
+                        <ShieldCheck className="w-3 h-3" /> {u.role === "college_admin" ? "Remove admin" : "Make admin"}
+                      </button>
+                      <button disabled={busy} onClick={() => toggleActive(u)} className={`${btn} ${u.is_active ? "border-orange-400/30 text-orange-300" : "border-pastel-green/30 text-pastel-green"}`}>
+                        {u.is_active ? <><Ban className="w-3 h-3" /> Suspend</> : <><RotateCcw className="w-3 h-3" /> Restore</>}
+                      </button>
+                      <button disabled={busy} onClick={() => remove(u)} className={`${btn} border-red-500/30 text-red-400`} aria-label={`Remove ${u.username}`}>
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {!usersLoaded && <div className="h-24 bg-white/5 animate-pulse rounded-xl" />}
+            {usersLoaded && users.length === 0 && <p className="px-4 py-10 text-center text-gray-500 text-xs">No members found.</p>}
+          </div>
+
+          <div className="hidden md:block border border-white/10 rounded-xl overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-[10px] text-gray-500 uppercase tracking-widest border-b border-white/10">
@@ -435,7 +491,7 @@ export default function AdminPage() {
                     </motion.tr>
                   );
                 })}
-                {users.length === 0 && (
+                {usersLoaded && users.length === 0 && (
                   <tr><td colSpan={platformList.length + 3} className="px-4 py-10 text-center text-gray-500">No members found.</td></tr>
                 )}
               </tbody>
@@ -454,6 +510,7 @@ export default function AdminPage() {
             </div>
           )}
         </section>
+        )}
       </div>
     </main>
   );

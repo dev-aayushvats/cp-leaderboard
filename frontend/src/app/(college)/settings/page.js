@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { GraduationCap, Building2, Save, ArrowLeft, Loader2, BadgeCheck, ShieldAlert, Copy, Check, ExternalLink, AlertTriangle } from "lucide-react";
-import Link from "next/link";
+import { GraduationCap, Building2, Save, Loader2, BadgeCheck, ShieldAlert, Copy, Check, ExternalLink, AlertTriangle } from "lucide-react";
+import SiteHeader from "@/components/SiteHeader";
 import useRequireAuth from "@/store/useRequireAuth";
 import { getProfile, updateProfile, verifyHandle } from "@/utils/api";
 import useCollege from "@/utils/useCollege";
@@ -82,7 +82,14 @@ function HandleField({ platform, value, onChange, saved, onVerified }) {
       )}
 
       {saved && !isSaved && value.trim() && (
-        <p className="text-[10px] text-gray-500 ml-1">Save changes to link this handle, then verify it.</p>
+        saved.handle ? (
+          <p className="flex items-start gap-1.5 text-[11px] text-orange-300 ml-1" role="alert">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+            Saving replaces <span className="font-bold">{saved.handle}</span>: its stats{saved.verified ? " and verified badge" : ""} will be reset.
+          </p>
+        ) : (
+          <p className="text-[10px] text-gray-500 ml-1">Save changes to link this handle, then verify it.</p>
+        )
       )}
 
       {isSaved && !saved.verified && (
@@ -123,18 +130,21 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [status, setStatus] = useState("");
-  const [saved, setSaved] = useState({}); // server-side handle info, by platform id
+  const [saved, setSaved] = useState({});
+  const [initial, setInitial] = useState(null); // form values as last loaded from the server // server-side handle info, by platform id
 
   const [formData, setFormData] = useState({ batch: "", department: "", handles: {} });
 
   const loadProfile = useCallback(async () => {
     const res = await getProfile();
     setSaved(res.data.handles);
-    setFormData({
+    const loaded = {
       batch: res.data.batch ?? "",
       department: res.data.department || "",
       handles: Object.fromEntries(Object.entries(res.data.handles).map(([id, h]) => [id, h?.handle || ""])),
-    });
+    };
+    setFormData(loaded);
+    setInitial(loaded);
   }, []);
 
   useEffect(() => {
@@ -173,23 +183,25 @@ export default function Settings() {
     }
   };
 
+  const dirty = !!initial && JSON.stringify({ ...formData, batch: String(formData.batch) }) !== JSON.stringify({ ...initial, batch: String(initial.batch) });
+  const resets = Object.entries(formData.handles).filter(
+    ([id, v]) => saved[id]?.handle && v.trim().toLowerCase() !== saved[id].handle.toLowerCase()
+  ).length;
+
   if (initialLoading) return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-brand"/></div>;
 
   return (
-    <main className="min-h-screen bg-dark-bg flex items-center justify-center p-4 relative font-mono">
+    <main className="min-h-screen bg-dark-bg p-4 relative font-mono">
        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-brand/5 rounded-full blur-[128px]" />
       </div>
 
+      <SiteHeader back className="max-w-2xl mx-auto mb-6 pt-2" />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-2xl bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl relative z-10"
+        className="w-full max-w-2xl mx-auto bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl relative z-10"
       >
-        <Link href="/" className="inline-flex items-center text-xs text-gray-500 hover:text-white mb-6 transition-colors">
-          <ArrowLeft className="w-3 h-3 mr-1" /> Back to Leaderboard
-        </Link>
-
         <h1 className="text-2xl font-bold text-white mb-1">Profile Settings</h1>
         <p className="text-gray-500 text-xs mb-8">
           Update your personal info and coding handles.
@@ -248,8 +260,8 @@ export default function Settings() {
              <h2 className="text-xs font-bold text-white/50 uppercase tracking-widest border-b border-white/5 pb-2">
                 Linked Platforms
              </h2>
-             <p className="text-[10px] text-orange-400/80 italic">
-                * Changing a handle resets its stats and verification.
+             <p className="text-[11px] text-gray-500">
+                Changing a handle starts fresh: its stats and verification are reset.
              </p>
 
              <div className="space-y-6">
@@ -270,11 +282,11 @@ export default function Settings() {
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-white text-black font-bold py-3 rounded-lg hover:bg-gray-200 transition-all flex items-center justify-center gap-2"
+            disabled={loading || !dirty}
+            className="w-full bg-white text-black font-bold py-3 rounded-lg hover:bg-gray-200 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
-            Save Changes
+            {dirty ? (resets ? `Save changes (resets ${resets} handle${resets > 1 ? "s" : ""})` : "Save changes") : "No changes to save"}
           </button>
         </form>
       </motion.div>

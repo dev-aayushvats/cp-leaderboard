@@ -3,7 +3,9 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, BadgeCheck, ExternalLink, Loader2 } from "lucide-react";
+import { BadgeCheck, ExternalLink, Loader2, Pencil, Clock } from "lucide-react";
+import useAuthStore from "@/store/useAuthStore";
+import SiteHeader from "@/components/SiteHeader";
 import { getUserProfile } from "@/utils/api";
 import { styleFor } from "@/utils/platforms";
 import { timeAgo } from "@/utils/time";
@@ -49,11 +51,7 @@ export default function MemberProfile() {
     return () => { cancelled = true; };
   }, [username, preferred]);
 
-  const back = (
-    <Link href="/" className="inline-flex items-center text-xs text-gray-500 hover:text-white transition-colors">
-      <ArrowLeft className="w-3 h-3 mr-1" /> Back to Leaderboard
-    </Link>
-  );
+  const me = useAuthStore((s) => s.user);
 
   if (state.status === "loading") {
     return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-brand" /></div>;
@@ -62,7 +60,7 @@ export default function MemberProfile() {
     return (
       <main className="min-h-screen bg-dark-bg text-gray-200 font-mono p-8">
         <div className="max-w-3xl mx-auto space-y-6">
-          {back}
+          <SiteHeader back />
           <div className="p-12 text-center border border-dashed border-white/10 rounded-lg">
             <p className="text-gray-300">{state.status === "missing" ? "Member not found." : "Couldn't load this profile."}</p>
             <p className="text-gray-500 text-xs mt-2">
@@ -93,14 +91,14 @@ export default function MemberProfile() {
       </div>
 
       <div className="relative z-10 max-w-3xl mx-auto px-4 md:px-6 py-8 space-y-8">
-        {back}
+        <SiteHeader back />
 
         {/* Header */}
         <header className="flex items-center gap-4">
           <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold text-black shadow-lg ${st ? st.avatar : "bg-gradient-to-br from-gray-300 to-gray-500"}`}>
             {p.username.charAt(0).toUpperCase()}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight truncate">{p.username}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-1.5">
               {p.department && <Chip>{p.department}</Chip>}
@@ -110,6 +108,11 @@ export default function MemberProfile() {
               </span>
             </div>
           </div>
+          {me && me.username === p.username && (
+            <Link href="/settings" className="shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-white/15 text-gray-300 hover:text-white hover:border-white/40 transition-colors">
+              <Pencil className="w-3 h-3" /> Edit profile
+            </Link>
+          )}
         </header>
 
         {!current ? (
@@ -146,10 +149,19 @@ export default function MemberProfile() {
               <span className="text-[11px] text-gray-500">{ago ? `Updated ${ago}` : "Not synced yet"}</span>
             </div>
 
+            {!ago && (
+              <div className="flex items-start gap-2.5 text-xs text-gray-300 bg-brand/5 border border-brand/20 rounded-lg px-4 py-3">
+                <Clock className="w-4 h-4 text-brand shrink-0 mt-px" />
+                <span>
+                  Waiting for the first sync. Ratings are fetched in the background, so this fills in within a few hours of linking a handle.
+                </span>
+              </div>
+            )}
+
             {/* Stat tiles */}
             <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Tile label="Rank" value={`#${current.rank}`} sub={`of ${fmt(current.participants)} in college`} accent={st.text} />
-              <Tile label="Rating" value={rated ? fmt(current.rating) : "Unrated"} sub={rated ? undefined : "No rated contests yet"} />
+              <Tile label="Rating" value={rated ? fmt(current.rating) : "Unrated"} sub={rated ? undefined : ago ? "No rated contests yet" : "Pending first sync"} />
               <Tile label="Peak rating" value={current.max_rating > 0 ? fmt(current.max_rating) : "–"} />
               <Tile
                 label="Solved"

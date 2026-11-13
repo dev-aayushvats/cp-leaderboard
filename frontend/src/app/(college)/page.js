@@ -3,14 +3,11 @@ import { useEffect, useState } from "react";
 import LeaderboardTable from "@/components/LeaderboardTable";
 import Link from "next/link";
 import useAuthStore from "@/store/useAuthStore"; // Import Zustand store
-import useCollege from "@/utils/useCollege";
-import CollegeLogo from "@/components/CollegeLogo";
-import UserMenu from "@/components/UserMenu";
+import SiteHeader from "@/components/SiteHeader";
 
 export default function Home() {
   // Zustand Hooks
   const { user } = useAuthStore();
-  const college = useCollege();
 
   // Hydration fix: Ensure we only show auth state after client loads
   const [isHydrated, setIsHydrated] = useState(false);
@@ -18,6 +15,7 @@ export default function Home() {
   useEffect(() => {
     // Manually trigger rehydration or just wait for mount
     useAuthStore.persist.rehydrate();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsHydrated(true);
   }, []);
 
@@ -31,20 +29,7 @@ export default function Home() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-pastel-red/5 rounded-full blur-[128px]" />
       </div>
 
-      {/* Header with User Profile */}
-      <div className="relative z-50 p-6 flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-3 min-w-0">
-          <CollegeLogo college={college} size={32} />
-          <span className="text-sm font-bold text-gray-200 truncate hidden sm:block">{college?.name}</span>
-        </Link>
-        {isHydrated && user ? (
-          <UserMenu user={user} />
-        ) : (
-          <Link href="/login" className="text-sm px-4 py-1.5 rounded-full border border-white/15 text-gray-300 hover:text-white hover:border-white/40 transition-colors">
-            Log in
-          </Link>
-        )}
-      </div>
+      <SiteHeader className="p-6" />
 
       {/* Main Container - Top Aligned, Centered Horizontally */}
       <div className="relative z-10 max-w-5xl mx-auto px-6 pt-10 md:pt-16 pb-20">

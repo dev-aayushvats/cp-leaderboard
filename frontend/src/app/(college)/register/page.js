@@ -177,7 +177,7 @@ export default function Register() {
                    />
                 </div>
                 <p className="text-center text-xs text-gray-500">
-                  Didn't receive code? <button type="button" onClick={() => setStep(1)} className="text-brand hover:underline">Try again</button>
+                  Didn&apos;t receive code? <button type="button" onClick={() => setStep(1)} className="text-brand hover:underline">Try again</button>
                 </p>
               </motion.div>
             )}
