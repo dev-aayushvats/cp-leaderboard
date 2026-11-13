@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
-  Loader2, ShieldCheck, Users, Search, Ban, RotateCcw, Trash2, BadgeCheck, Save, ChevronLeft, ChevronRight, AlertTriangle,
+  Loader2, ShieldCheck, Users, Search, Copy, Check, Download, Link2, X, Ban, RotateCcw, Trash2, BadgeCheck, Save, ChevronLeft, ChevronRight, AlertTriangle,
 } from "lucide-react";
 import useRequireAuth from "@/store/useRequireAuth";
 import {
@@ -18,17 +18,65 @@ import ImportMembers from "@/components/ImportMembers";
 import { timeAgo } from "@/utils/time";
 
 const PAGE_SIZE = 25;
+const NO_FILTERS = { role: "", status: "", batch: "", department: "", problem: "" };
+// Only send what is set; empty strings would be ignored by the API anyway
+const activeFilters = (search, f) => ({ search: search || undefined, ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)) });
 const errMsg = (err, fallback) => err.response?.data?.error || fallback;
 
-function StatCard({ label, value, sub }) {
-  return (
-    <div className="bg-white/[0.03] border border-white/10 rounded-xl p-4">
+function StatCard({ label, value, sub, onClick, hint }) {
+  const body = (
+    <>
       <p className="text-[10px] text-gray-500 uppercase tracking-widest">{label}</p>
       <p className="text-2xl font-bold text-white mt-1">{value}</p>
       {sub && <p className="text-[11px] text-gray-500 mt-0.5">{sub}</p>}
+    </>
+  );
+  const base = "bg-white/[0.03] border border-white/10 rounded-xl p-4 text-left";
+  if (!onClick) return <div className={base}>{body}</div>;
+  return (
+    <button onClick={onClick} aria-label={`${label}: ${hint}`} title={hint} className={`${base} flex flex-col items-start justify-start hover:border-white/30 hover:bg-white/[0.06] transition-colors`}>
+      {body}
+    </button>
+  );
+}
+
+// Invite link for the college: what an admin pastes into a group chat. Uses the address this page
+// is served from, so it is right for subdomains and custom domains alike.
+function ShareCard({ college }) {
+  const [url, setUrl] = useState("");
+  const [copied, setCopied] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setUrl(window.location.origin); }, []);
+  const domains = college?.email_domains ?? [];
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard blocked: the link is selectable */ }
+  };
+  return (
+    <div className="flex items-center gap-3 flex-wrap bg-brand/5 border border-brand/20 rounded-xl px-4 py-3">
+      <Link2 className="w-4 h-4 text-brand shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] text-gray-500 uppercase tracking-widest">Your college link</p>
+        <p className="text-sm text-gray-200 truncate select-all">{url || "…"}</p>
+        <p className="text-[11px] text-gray-500">
+          {domains.length ? `Students sign up with a ${domains.map((d) => "@" + d).join(" or ")} address.` : "Registration is open to any email address."}
+        </p>
+      </div>
+      <button onClick={copy} disabled={!url} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 text-xs font-bold text-gray-200 hover:border-white/40 transition-colors">
+        {copied ? <><Check className="w-3.5 h-3.5 text-pastel-green" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy link</>}
+      </button>
     </div>
   );
 }
+
+const csvCell = (v) => {
+  let t = v == null ? "" : String(v);
+  if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; // stop spreadsheets from running a cell as a formula
+  return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+};
 
 // One linked handle in the members table: verified badge, and a warning if syncing it keeps failing.
 function Handle({ info }) {
@@ -82,6 +130,7 @@ function ColorField({ label, value, onChange, fallback }) {
 
 function CollegeSettings({ onError, onSaved }) {
   const [form, setForm] = useState(null);
+  const [initial, setInitial] = useState(null);
   const [customDomain, setCustomDomain] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -90,7 +139,7 @@ function CollegeSettings({ onError, onSaved }) {
     getAdminCollege()
       .then((res) => {
         setCustomDomain(res.data.custom_domain);
-        setForm({
+        const loaded = {
           name: res.data.name,
           logo_url: res.data.logo_url || "",
           tagline: res.data.tagline || "",
@@ -99,7 +148,9 @@ function CollegeSettings({ onError, onSaved }) {
           domains: res.data.email_domains.join(", "),
           departments: res.data.departments.join(", "),
           require_verified_handles: res.data.require_verified_handles,
-        });
+        };
+        setForm(loaded);
+        setInitial(loaded);
       })
       .catch((err) => onError(errMsg(err, "Failed to load college settings")));
   }, [onError]);
@@ -107,6 +158,7 @@ function CollegeSettings({ onError, onSaved }) {
   if (!form) return <div className="h-40 bg-white/5 animate-pulse rounded-xl" />;
 
   const set = (patch) => { setForm({ ...form, ...patch }); setSaved(false); };
+  const dirty = JSON.stringify(form) !== JSON.stringify(initial);
   const colorsInvalid = !!(colorProblem(form.brand_primary, "Primary color") || colorProblem(form.brand_secondary, "Secondary color"));
 
   const save = async (e) => {
@@ -124,6 +176,7 @@ function CollegeSettings({ onError, onSaved }) {
         departments: form.departments.split(",").map((d) => d.trim()).filter(Boolean),
         require_verified_handles: form.require_verified_handles,
       });
+      setInitial(form);
       setSaved(true);
       onSaved?.(); // re-render the server layout so the new name/colors/logo apply right away
     } catch (err) {
@@ -220,11 +273,30 @@ function CollegeSettings({ onError, onSaved }) {
         </label>
       </section>
 
-      <div className="flex items-center gap-3">
-        <button disabled={saving || colorsInvalid} className="bg-white text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2 disabled:opacity-50">
-          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save settings
-        </button>
-        {saved && <span className="text-xs text-pastel-green">Saved</span>}
+      {/* Pinned to the bottom of the screen while there is something to save */}
+      <div
+        className={`sticky bottom-4 z-40 flex items-center justify-between gap-3 flex-wrap rounded-xl border px-4 py-3 shadow-xl backdrop-blur ${
+          dirty ? "bg-[#161616]/95 border-brand/40" : "bg-transparent border-transparent shadow-none"
+        }`}
+      >
+        {dirty ? (
+          <>
+            <span className="text-xs text-gray-300">
+              {colorsInvalid ? "Fix the highlighted colors to save." : "You have unsaved changes."}
+            </span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => { setForm(initial); setSaved(false); }} disabled={saving}
+                className="text-xs font-bold px-3 py-2 rounded-lg border border-white/15 text-gray-300 hover:border-white/40 disabled:opacity-50">
+                Discard
+              </button>
+              <button disabled={saving || colorsInvalid} className="bg-white text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2 disabled:opacity-50">
+                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save settings
+              </button>
+            </div>
+          </>
+        ) : (
+          <span className="text-xs text-pastel-green min-h-[2rem] flex items-center">{saved ? "Saved" : ""}</span>
+        )}
       </div>
     </form>
   );
@@ -245,6 +317,8 @@ export default function AdminPage() {
   const [usersLoaded, setUsersLoaded] = useState(false);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState({ role: "", status: "", batch: "", department: "", problem: "" });
+  const [exporting, setExporting] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [me, setMe] = useState(null);
   const [tab, setTab] = useState("members");
@@ -267,14 +341,14 @@ export default function AdminPage() {
 
   const loadUsers = useCallback(async () => {
     try {
-      const res = await getAdminUsers({ search: search || undefined, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
+      const res = await getAdminUsers({ ...activeFilters(search, filters), limit: PAGE_SIZE, offset: page * PAGE_SIZE });
       setUsers(res.data.users);
       setTotal(res.data.total);
       setUsersLoaded(true);
     } catch (err) {
       setError(errMsg(err, "Failed to load members"));
     }
-  }, [search, page]);
+  }, [search, filters, page]);
 
   useEffect(() => {
     if (!authorized) return;
@@ -310,6 +384,38 @@ export default function AdminPage() {
     act(u, () => deleteAdminUser(u.user_id), "Failed to remove user");
   };
 
+  const changeFilter = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(0); };
+  const jumpTo = (patch) => { setFilters({ ...NO_FILTERS, ...patch }); setSearch(""); setPage(0); setTab("members"); };
+  const filterCount = Object.values(filters).filter(Boolean).length;
+
+  const exportCsv = async () => {
+    setExporting(true);
+    setError("");
+    try {
+      const rows = [];
+      for (let offset = 0; ; offset += 200) {
+        const res = await getAdminUsers({ ...activeFilters(search, filters), limit: 200, offset });
+        rows.push(...res.data.users);
+        if (rows.length >= res.data.total || res.data.users.length === 0) break;
+      }
+      const head = ["email", "name", "role", "status", "batch", "department", ...platformList.flatMap((p) => [p.id, `${p.id}_verified`])];
+      const lines = [head, ...rows.map((u) => [
+        u.email, u.username, u.role === "college_admin" ? "admin" : "student", u.is_active ? "active" : "suspended", u.batch ?? "", u.department ?? "",
+        ...platformList.flatMap((p) => [u.handles?.[p.id]?.handle ?? "", u.handles?.[p.id] ? (u.handles[p.id].verified ? "yes" : "no") : ""]),
+      ])];
+      const blob = new Blob(["\uFEFF" + lines.map((l) => l.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `members-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      setError(errMsg(err, "Export failed"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (!authorized) {
     return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-brand" /></div>;
   }
@@ -337,15 +443,19 @@ export default function AdminPage() {
           <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-lg px-4 py-3" role="alert">{error}</div>
         )}
 
+        <ShareCard college={college} />
+
         {/* Overview */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Members" value={stats?.members.total ?? "–"} sub={stats && `${stats.members.active} active · ${stats.members.admins} admin`} />
-          <StatCard label="Suspended" value={stats ? stats.members.total - stats.members.active : "–"} />
+          <StatCard label="Members" value={stats?.members.total ?? "–"} sub={stats && `${stats.members.active} active · ${stats.members.admins} admin`} onClick={() => jumpTo({})} hint="show all members" />
+          <StatCard label="Suspended" value={stats ? stats.members.total - stats.members.active : "–"} onClick={() => jumpTo({ status: "suspended" })} hint="show suspended members" />
           <StatCard label="Verified handles" value={stats ? `${verifiedTotal}/${linkedTotal}` : "–"} sub={byPlatform || "verified / linked"} />
           <StatCard
             label="Sync issues"
             value={stats ? stats.sync.issues : "–"}
             sub={stats ? (syncedAgo ? `last sync ${syncedAgo}` : "no sync has run yet") : undefined}
+            onClick={() => jumpTo({ problem: "1" })}
+            hint="show members with sync issues"
           />
         </section>
 
@@ -374,6 +484,9 @@ export default function AdminPage() {
             <h2 className="text-xs font-bold text-white/50 uppercase tracking-widest flex items-center gap-2">
               <Users className="w-4 h-4" /> Members ({total})
             </h2>
+            <button onClick={exportCsv} disabled={exporting || total === 0} className={`${btn} border-white/10 text-gray-300 hover:border-white/30 md:order-last`}>
+              {exporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} Export CSV
+            </button>
             <div className="relative w-full md:w-auto">
               <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-500" />
               <input
@@ -383,6 +496,39 @@ export default function AdminPage() {
                 className="bg-dark-bg/50 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-xs text-gray-200 focus:border-white/30 focus:outline-none w-full md:w-64"
               />
             </div>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              ["role", "All roles", [["student", "Students"], ["college_admin", "Admins"]]],
+              ["status", "Any status", [["active", "Active"], ["suspended", "Suspended"]]],
+              ...((college?.batches ?? []).length ? [["batch", "All batches", college.batches.map((b) => [String(b), `Batch of ${b}`])]] : []),
+              ...((college?.departments ?? []).length ? [["department", "All departments", college.departments.map((d) => [d, d])]] : []),
+            ].map(([key, all, options]) => (
+              <select
+                key={key}
+                value={filters[key]}
+                onChange={(e) => changeFilter({ [key]: e.target.value })}
+                aria-label={all.replace(/^All |^Any /, "Filter by ")}
+                className={`bg-dark-bg/50 border rounded-lg py-1.5 px-2 text-xs text-gray-200 focus:outline-none focus:border-white/30 ${filters[key] ? "border-brand/50" : "border-white/10"}`}
+              >
+                <option value="">{all}</option>
+                {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            ))}
+            <button
+              onClick={() => changeFilter({ problem: filters.problem ? "" : "1" })}
+              aria-pressed={!!filters.problem}
+              className={`${btn} ${filters.problem ? "border-orange-400/50 text-orange-300 bg-orange-400/10" : "border-white/10 text-gray-400 hover:border-white/30"}`}
+            >
+              <AlertTriangle className="w-3 h-3" /> Sync issues
+            </button>
+            {(filterCount > 0 || search) && (
+              <button onClick={() => { setFilters(NO_FILTERS); setSearch(""); setPage(0); }} className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 underline underline-offset-2">
+                <X className="w-3 h-3" /> Clear
+              </button>
+            )}
           </div>
 
           {/* Phones: one card per member */}
@@ -432,7 +578,7 @@ export default function AdminPage() {
               );
             })}
             {!usersLoaded && <div className="h-24 bg-white/5 animate-pulse rounded-xl" />}
-            {usersLoaded && users.length === 0 && <p className="px-4 py-10 text-center text-gray-500 text-xs">No members found.</p>}
+            {usersLoaded && users.length === 0 && <p className="px-4 py-10 text-center text-gray-500 text-xs">{filterCount > 0 || search ? "No members match these filters." : "No members found."}</p>}
           </div>
 
           <div className="hidden md:block border border-white/10 rounded-xl overflow-x-auto">
@@ -492,7 +638,7 @@ export default function AdminPage() {
                   );
                 })}
                 {usersLoaded && users.length === 0 && (
-                  <tr><td colSpan={platformList.length + 3} className="px-4 py-10 text-center text-gray-500">No members found.</td></tr>
+                  <tr><td colSpan={platformList.length + 3} className="px-4 py-10 text-center text-gray-500">{filterCount > 0 || search ? "No members match these filters." : "No members found."}</td></tr>
                 )}
               </tbody>
             </table>
