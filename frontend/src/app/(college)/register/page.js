@@ -122,8 +122,8 @@ export default function Register() {
                     </div>
                     {departments.length > 0 && (
                       <div className="relative group">
-                        <Building2 className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-pastel-green transition-colors" />
-                        <select name="department" aria-label="Department" defaultValue="" onChange={handleChange} className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-pastel-green/50 outline-none transition-all text-sm">
+                        <Building2 className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-brand transition-colors" />
+                        <select name="department" aria-label="Department" defaultValue="" onChange={handleChange} className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-brand/50 outline-none transition-all text-sm">
                           <option value="">Department</option>
                           {departments.map((d) => <option key={d} value={d}>{d}</option>)}
                         </select>
@@ -165,14 +165,14 @@ export default function Register() {
               >
                 {/* OTP Input */}
                 <div className="relative group">
-                   <KeyRound className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-pastel-green transition-colors" />
+                   <KeyRound className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-brand transition-colors" />
                    <input 
                       type="text" 
                       name="otp" 
                       placeholder="Enter 6-digit Code" 
                       required 
                       maxLength="6"
-                      className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-pastel-green/50 outline-none transition-all text-lg tracking-widest font-bold text-center"
+                      className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-brand/50 outline-none transition-all text-lg tracking-widest font-bold text-center"
                       onChange={handleChange}
                    />
                 </div>
@@ -190,7 +190,7 @@ export default function Register() {
             className={`w-full font-bold py-3 rounded-lg transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2 mt-6 ${
                 step === 1 
                 ? "bg-white text-black hover:bg-brand" 
-                : "bg-pastel-green text-black hover:bg-emerald-400"
+                : "bg-brand text-black hover:opacity-90"
             }`}
           >
             {loading ? (

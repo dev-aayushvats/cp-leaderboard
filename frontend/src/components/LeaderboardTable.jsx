@@ -2,7 +2,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Filter, BadgeCheck } from "lucide-react";
+import { Trophy, Filter, BadgeCheck, Search, ArrowDown, ArrowUp, X } from "lucide-react";
+import useAuthStore from "@/store/useAuthStore";
 import { getLeaderboard } from "@/utils/api";
 import useCollege from "@/utils/useCollege";
 import { styleFor, DEFAULT_PLATFORMS } from "@/utils/platforms";
@@ -14,12 +15,12 @@ const ShimmerHeader = ({ title }) => {
   return (
     <div className="relative inline-block">
       {/* Background Text (Static) */}
-      <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white/20">
+      <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white/20">
         {title}
       </h1>
       {/* Overlay Text (Animated Gradient) */}
       <motion.h1
-        className="text-4xl md:text-5xl font-bold tracking-tight absolute top-0 left-0 text-transparent bg-clip-text bg-gradient-to-r from-brand via-brand-2 to-brand"
+        className="text-3xl md:text-4xl font-bold tracking-tight absolute top-0 left-0 text-transparent bg-clip-text bg-gradient-to-r from-brand via-brand-2 to-brand"
         animate={{
           backgroundPosition: ["0% center", "200% center"],
         }}
@@ -36,6 +37,21 @@ const ShimmerHeader = ({ title }) => {
   );
 };
 
+function SortHead({ k, sort, onSort, className, children }) {
+  const active = sort.key === k;
+  const Icon = active && sort.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <button
+      onClick={() => onSort(k)}
+      aria-label={`Sort by ${typeof children === "string" ? children : k}`}
+      className={`${className} inline-flex items-center justify-end gap-1 uppercase tracking-[0.2em] hover:text-white transition-colors ${active ? "text-white" : ""}`}
+    >
+      {children}
+      <Icon className={`w-3 h-3 ${active ? "opacity-100" : "opacity-0"}`} />
+    </button>
+  );
+}
+
 const selectClass =
   "bg-black/50 border border-white/10 rounded px-3 py-2 text-xs text-white focus:border-brand outline-none";
 
@@ -50,6 +66,9 @@ export default function LeaderboardTable() {
   const [filters, setFilters] = useState({ batch: "", department: "" });
   const [showFilters, setShowFilters] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState({ key: "rating", dir: "desc" });
+  const me = useAuthStore((s) => s.user);
 
   // The result remembers which request produced it. "Loading" is simply "the stored
   // result isn't for the request we want now", so a slow, older response can never
@@ -85,10 +104,30 @@ export default function LeaderboardTable() {
     return times.length ? new Date(Math.max(...times)).toISOString() : null;
   }, [data]);
 
+  const secondaryField = st.secondary === "solved" ? "questions_solved" : "max_rating";
+  const sortField = sort.key === "rating" ? "rating" : secondaryField;
+  const toggleSort = (key) =>
+    setSort((cur) => (cur.key === key ? { key, dir: cur.dir === "desc" ? "asc" : "desc" } : { key, dir: "desc" }));
+
+  // Rank is always the position by rating (what the API returns), whatever the sort or search.
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let list = data.map((u, i) => ({ ...u, rank: i + 1 }));
+    if (q) list = list.filter((u) => u.username.toLowerCase().includes(q) || String(u.platform_handle).toLowerCase().includes(q));
+    if (!(sort.key === "rating" && sort.dir === "desc")) {
+      const f = sortField, d = sort.dir === "desc" ? -1 : 1;
+      list = [...list].sort((a, b) => ((a[f] ?? 0) - (b[f] ?? 0)) * d || a.rank - b.rank);
+    }
+    return list;
+  }, [data, query, sort, sortField]);
+
+  const mine = me ? data.findIndex((u) => u.username === me.username) : -1;
+  const isMe = (u) => !!me && u.username === me.username;
+
   return (
     <div className="w-full">
       {/* --- HEADER SECTION --- */}
-      <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-6 border-b border-white/5 pb-8">
+      <div className="mb-6">
         <div>
           <ShimmerHeader title={college ? `${college.name} Rankings` : "Rankings"} />
           <p className="text-gray-500 mt-2 font-mono text-xs md:text-sm tracking-wider">
@@ -108,21 +147,69 @@ export default function LeaderboardTable() {
           )}
         </div>
 
-        {/* Platform Switcher (Segmented Control Style) */}
-        <div className="flex flex-wrap bg-white/5 p-1 rounded-lg backdrop-blur-sm border border-white/5">
-          {platforms.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPlatform(p.id)}
-              className={`px-5 py-2 rounded-md text-sm font-bold font-mono transition-all duration-300 tracking-tight ${
-                platform === p.id ? styleFor(p.id).tab : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              {p.label}
+      </div>
+
+      {/* Platform tabs: one row, scrolls sideways on small screens */}
+      <div role="tablist" className="flex flex-nowrap overflow-x-auto bg-white/5 p-1 rounded-lg border border-white/5 mb-4 [scrollbar-width:none]">
+        {platforms.map((p) => (
+          <button
+            key={p.id}
+            role="tab"
+            aria-selected={platform === p.id}
+            onClick={() => setPlatform(p.id)}
+            className={`flex-1 md:flex-none whitespace-nowrap px-5 py-2 rounded-md text-sm font-bold font-mono transition-all duration-300 tracking-tight ${
+              platform === p.id ? styleFor(p.id).tab : "text-gray-500 hover:text-gray-300"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search + you */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or handle"
+            aria-label="Search the leaderboard"
+            className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-9 pr-8 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-brand/60"
+          />
+          {query && (
+            <button onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-2.5 text-gray-500 hover:text-white">
+              <X className="w-4 h-4" />
             </button>
-          ))}
+          )}
         </div>
       </div>
+
+      {me && !loading && !error && (
+        <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-brand/30 bg-brand/5 text-sm">
+          {mine >= 0 ? (
+            <>
+              <span className="text-gray-300">
+                Your rank <span className="font-bold text-white">#{mine + 1}</span> of {data.length}
+                <span className="text-gray-500"> · rating </span>
+                <span className={`font-mono font-bold ${st.text}`}>{data[mine].rating}</span>
+              </span>
+              <button
+                onClick={() => { setQuery(""); setTimeout(() => document.getElementById("my-row")?.scrollIntoView({ block: "center", behavior: "smooth" }), 50); }}
+                className="text-xs text-brand hover:underline shrink-0"
+              >
+                Jump to me
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-gray-400">You aren&apos;t ranked on this platform yet.</span>
+              <Link href="/settings" className="text-xs text-brand hover:underline shrink-0">Add your handle</Link>
+            </>
+          )}
+        </div>
+      )}
 
       {/* FILTER BAR (Collapsible) */}
       <AnimatePresence>
@@ -159,14 +246,16 @@ export default function LeaderboardTable() {
       {/* --- TABLE SECTION --- */}
       <div className="relative">
 
-        {/* Table Column Headers */}
-        <div className="grid grid-cols-12 gap-4 px-4 py-3 text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-[0.2em] border-b border-white/10 select-none">
+        {/* Table Column Headers (desktop only; on phones each row labels itself) */}
+        <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-[0.2em] border-b border-white/10 select-none">
           <div className="col-span-1 text-center">#</div>
           <div className="col-span-6">Competitor</div>
-          <div className="col-span-2 text-right text-gray-400">
-            {st.secondary === "solved" ? "Questions" : "Peak Rating"}
+          <div className="col-span-2 text-right">
+            <SortHead k="secondary" sort={sort} onSort={toggleSort} className="w-full">{st.secondary === "solved" ? "Questions" : "Peak Rating"}</SortHead>
           </div>
-          <div className="col-span-3 text-right text-brand/80">Current Rating</div>
+          <div className="col-span-3 text-right">
+            <SortHead k="rating" sort={sort} onSort={toggleSort} className="w-full text-brand/80">Current Rating</SortHead>
+          </div>
         </div>
 
         {/* Table Body */}
@@ -183,7 +272,7 @@ export default function LeaderboardTable() {
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
-                key={`${platform}-${filters.batch}-${filters.department}`} // key change triggers re-animation
+                key={`${platform}-${filters.batch}-${filters.department}-${query}-${sort.key}-${sort.dir}`} // key change triggers re-animation
                 initial="hidden"
                 animate="show"
                 variants={{
@@ -191,25 +280,28 @@ export default function LeaderboardTable() {
                   show: { opacity: 1, transition: { staggerChildren: 0.05 } },
                 }}
               >
-                {data.map((user, index) => (
+                {rows.map((user) => (
                   <motion.div
                     key={`${user.username}-${user.platform_handle}`}
                     variants={{
                       hidden: { opacity: 0, y: 10 },
                       show: { opacity: 1, y: 0 },
                     }}
-                    className="grid grid-cols-12 gap-4 px-4 py-4 items-center bg-white/[0.02] hover:bg-white/[0.05] border border-transparent hover:border-white/10 rounded-lg transition-all group"
+                    id={isMe(user) ? "my-row" : undefined}
+                    className={`grid grid-cols-12 gap-2 md:gap-4 px-3 md:px-4 py-4 items-center rounded-lg transition-all group border ${
+                      isMe(user) ? "bg-brand/10 border-brand/40" : "bg-white/[0.02] hover:bg-white/[0.05] border-transparent hover:border-white/10"
+                    }`}
                   >
                     {/* 1. RANK COLUMN */}
                     <div className="col-span-1 flex justify-center font-mono text-gray-400 font-bold">
-                      {index === 0 ? <Trophy className="w-5 h-5 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]" /> :
-                       index === 1 ? <Trophy className="w-4 h-4 text-gray-300" /> :
-                       index === 2 ? <Trophy className="w-4 h-4 text-amber-700" /> :
-                       <span className="opacity-40 text-sm">{(index + 1).toString().padStart(2, '0')}</span>}
+                      {user.rank === 1 ? <Trophy className="w-5 h-5 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]" /> :
+                       user.rank === 2 ? <Trophy className="w-4 h-4 text-gray-300" /> :
+                       user.rank === 3 ? <Trophy className="w-4 h-4 text-amber-700" /> :
+                       <span className="opacity-40 text-sm">{user.rank.toString().padStart(2, '0')}</span>}
                     </div>
 
                     {/* 2. USER INFO COLUMN */}
-                    <div className="col-span-6 flex items-center gap-4 min-w-0">
+                    <div className="col-span-8 md:col-span-6 flex items-center gap-3 md:gap-4 min-w-0">
                       {/* Avatar Circle */}
                       <div className={`w-9 h-9 shrink-0 rounded-md flex items-center justify-center text-xs font-bold text-black shadow-lg ${st.avatar}`}>
                         {user.username.charAt(0).toUpperCase()}
@@ -222,6 +314,7 @@ export default function LeaderboardTable() {
                           className="font-bold text-gray-200 text-sm tracking-tight group-hover:text-white hover:underline underline-offset-2 transition-colors truncate"
                         >
                           {user.username}
+                          {isMe(user) && <span className="ml-2 text-[9px] font-bold uppercase tracking-wider text-brand border border-brand/40 rounded px-1 align-middle">You</span>}
                         </Link>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] text-gray-500 font-mono tracking-wider uppercase">
@@ -237,11 +330,15 @@ export default function LeaderboardTable() {
                             <span className="text-[9px] text-gray-400 border border-white/10 px-1 rounded">&apos;{String(user.batch).slice(-2)}</span>
                           )}
                         </div>
+                        <span className="md:hidden text-[11px] text-gray-500 font-mono mt-0.5">
+                          {st.secondary === "solved" ? `${user.questions_solved} solved` : `peak ${user.max_rating}`}
+                          {user.questions_today > 0 && st.secondary === "solved" && <span className="text-pastel-green"> · +{user.questions_today} today</span>}
+                        </span>
                       </div>
                     </div>
 
                     {/* 3. DYNAMIC METRIC COLUMN */}
-                    <div className="col-span-2 text-right font-mono text-sm">
+                    <div className="hidden md:block col-span-2 text-right font-mono text-sm">
                       {st.secondary === "solved" ? (
                         <div className="flex flex-col items-end justify-center">
                           {/* Total Solved */}
@@ -271,7 +368,7 @@ export default function LeaderboardTable() {
 
                     {/* 4. RATING COLUMN */}
                     <div className="col-span-3 text-right">
-                      <span className={`font-mono font-bold text-lg tracking-tight drop-shadow-sm ${st.text}`}>
+                      <span className={`font-mono font-bold text-base md:text-lg tracking-tight drop-shadow-sm ${st.text}`}>
                         {user.rating}
                       </span>
                     </div>
@@ -290,13 +387,13 @@ export default function LeaderboardTable() {
           )}
 
           {/* Empty State */}
-          {!loading && !error && data.length === 0 && (
+          {!loading && !error && rows.length === 0 && (
             <div className="p-12 text-center border border-dashed border-white/10 rounded-lg bg-white/[0.01]">
               <p className="text-gray-500 font-mono text-sm">
-                {activeFilters > 0 ? "No members match these filters." : "No one is ranked here yet."}
+                {query ? `No one matches "${query}".` : activeFilters > 0 ? "No members match these filters." : "No one is ranked here yet."}
               </p>
               <p className="text-gray-600 text-xs mt-2">
-                {activeFilters > 0 ? "Try clearing a filter." : "Ratings appear after a member's first sync."}
+                {query ? "Check the spelling or try a handle." : activeFilters > 0 ? "Try clearing a filter." : "Ratings appear after a member's first sync."}
               </p>
             </div>
           )}

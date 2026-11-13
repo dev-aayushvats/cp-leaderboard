@@ -3,14 +3,13 @@ import { useEffect, useState } from "react";
 import LeaderboardTable from "@/components/LeaderboardTable";
 import Link from "next/link";
 import useAuthStore from "@/store/useAuthStore"; // Import Zustand store
-import { LogOut } from "lucide-react";
 import useCollege from "@/utils/useCollege";
 import CollegeLogo from "@/components/CollegeLogo";
-import { Settings as SettingsIcon, ShieldCheck } from "lucide-react";
+import UserMenu from "@/components/UserMenu";
 
 export default function Home() {
   // Zustand Hooks
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const college = useCollege();
 
   // Hydration fix: Ensure we only show auth state after client loads
@@ -39,30 +38,16 @@ export default function Home() {
           <span className="text-sm font-bold text-gray-200 truncate hidden sm:block">{college?.name}</span>
         </Link>
         {isHydrated && user ? (
-          <div className="flex items-center gap-4">
-            {/* ... User Logged In UI ... */}
-            <span className="text-xs text-gray-500">
-              Logged in as <span className="text-brand">{user.username}</span>
-            </span>
-              {user.role === "college_admin" && (
-                <Link href="/admin" className="p-2 hover:bg-white/10 rounded-full text-pastel-green/80 hover:text-pastel-green transition-colors" title="Admin panel">
-                    <ShieldCheck className="w-4 h-4" />
-                </Link>
-              )}
-              <Link href="/settings" className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors" title="Settings">
-                  <SettingsIcon className="w-4 h-4" />
-              </Link>
-            <button onClick={logout} className="..."><LogOut className="w-4 h-4" /></button>
-          </div>
+          <UserMenu user={user} />
         ) : (
-          <Link href="/login" className="text-xs text-gray-500 hover:text-white transition-colors">
-            LOGIN
+          <Link href="/login" className="text-sm px-4 py-1.5 rounded-full border border-white/15 text-gray-300 hover:text-white hover:border-white/40 transition-colors">
+            Log in
           </Link>
         )}
       </div>
 
       {/* Main Container - Top Aligned, Centered Horizontally */}
-      <div className="relative z-10 max-w-5xl mx-auto px-6 pt-24 pb-20">
+      <div className="relative z-10 max-w-5xl mx-auto px-6 pt-10 md:pt-16 pb-20">
         <LeaderboardTable />
       </div>
 

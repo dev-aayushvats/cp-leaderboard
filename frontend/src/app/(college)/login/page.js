@@ -62,7 +62,7 @@ export default function Login() {
   return (
     <main className="min-h-screen bg-dark-bg flex items-center justify-center p-4 relative overflow-hidden font-mono">
       {/* Background Ambience */}
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-pastel-green/5 rounded-full blur-[128px] pointer-events-none" />
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-brand/5 rounded-full blur-[128px] pointer-events-none" />
       
       <motion.div
         layout
@@ -97,7 +97,7 @@ export default function Login() {
                 exit={{ opacity: 0, x: -20 }}
                 className="relative group"
               >
-                <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-pastel-green transition-colors" />
+                <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-brand transition-colors" />
                 <input
                   type="email"
                   name="email"
@@ -105,7 +105,7 @@ export default function Login() {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-pastel-green/50 focus:ring-1 focus:ring-pastel-green/50 transition-all font-mono text-sm"
+                  className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-all font-mono text-sm"
                 />
               </motion.div>
             ) : (
@@ -117,19 +117,19 @@ export default function Login() {
                  className="space-y-4"
               >
                  <div className="relative group">
-                    <KeyRound className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-pastel-green transition-colors" />
+                    <KeyRound className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-brand transition-colors" />
                     <input 
                        type="text" 
                        name="otp" 
                        placeholder="Enter 6-digit Code" 
                        required 
                        maxLength="6"
-                       className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-pastel-green/50 outline-none transition-all text-lg tracking-widest font-bold text-center"
+                       className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-brand/50 outline-none transition-all text-lg tracking-widest font-bold text-center"
                        onChange={handleChange}
                     />
                  </div>
                  <p className="text-center text-xs text-gray-500">
-                   Wrong email? <button type="button" onClick={() => setStep(1)} className="text-pastel-green hover:underline">Go back</button>
+                   Wrong email? <button type="button" onClick={() => setStep(1)} className="text-brand hover:underline">Go back</button>
                  </p>
               </motion.div>
             )}
@@ -138,7 +138,7 @@ export default function Login() {
           <button 
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-pastel-green to-emerald-400 text-black font-bold py-3 rounded-lg hover:opacity-90 transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2 shadow-lg shadow-pastel-green/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-brand to-brand-2 text-black font-bold py-3 rounded-lg hover:opacity-90 transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2 shadow-lg shadow-brand/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -153,7 +153,7 @@ export default function Login() {
 
         <p className="mt-8 text-center text-xs text-gray-500 font-mono">
           Don't have an account?{" "}
-          <Link href="/register" className="text-pastel-green hover:underline">
+          <Link href="/register" className="text-brand hover:underline">
             Register
           </Link>
         </p>
