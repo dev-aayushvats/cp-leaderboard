@@ -23,7 +23,8 @@ app.use(resolveCollege);
 
 // Public college info (branding, sign-up rules, filter options) for the frontend.
 app.get('/college', async (req, res) => {
-    const { college_id, slug, name, logo_url, email_domains, require_verified_handles, departments } = req.college;
+    const { college_id, slug, name, logo_url, email_domains, require_verified_handles, departments,
+            brand_primary, brand_secondary, tagline } = req.college;
     const batches = await pool.query(
         `SELECT DISTINCT batch FROM users
          WHERE college_id = $1 AND is_active AND batch IS NOT NULL ORDER BY batch DESC`,
@@ -31,6 +32,7 @@ app.get('/college', async (req, res) => {
     );
     res.json({
         slug, name, logo_url, email_domains, require_verified_handles, departments,
+        brand_primary, brand_secondary, tagline,
         batches: batches.rows.map((r) => r.batch),
         platforms: platforms.describe(),
     });

@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../config/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { normalizeDomains, isValidDomain } = require('../lib/college');
+const { parseBrandColor } = require('../lib/branding');
 
 const router = express.Router();
 router.use('/admin', authenticate, requireAdmin);
@@ -135,13 +136,15 @@ const collegeSettings = (c) => ({
     slug: c.slug, name: c.name, logo_url: c.logo_url,
     email_domains: c.email_domains, require_verified_handles: c.require_verified_handles,
     departments: c.departments,
+    brand_primary: c.brand_primary, brand_secondary: c.brand_secondary, tagline: c.tagline,
+    custom_domain: c.custom_domain, // read-only here: set by the operator
 });
 
 router.get('/admin/college', (req, res) => res.json(collegeSettings(req.college)));
 
 router.patch('/admin/college', async (req, res) => {
     try {
-        const { name, logo_url, email_domains, require_verified_handles, departments } = req.body;
+        const { name, logo_url, email_domains, require_verified_handles, departments, brand_primary, brand_secondary, tagline } = req.body;
         const next = { ...req.college };
 
         if (name !== undefined) {
@@ -151,8 +154,8 @@ router.patch('/admin/college', async (req, res) => {
             next.name = name.trim();
         }
         if (logo_url !== undefined) {
-            if (logo_url !== null && logo_url !== '' && !/^https?:\/\/\S+$/.test(logo_url)) {
-                return res.status(400).json({ error: 'Logo must be an http(s) URL' });
+            if (logo_url !== null && logo_url !== '' && (!/^https?:\/\/\S+$/.test(logo_url) || logo_url.length > 500)) {
+                return res.status(400).json({ error: 'Logo must be an http(s) URL (max 500 characters)' });
             }
             next.logo_url = logo_url || null;
         }
@@ -170,6 +173,18 @@ router.patch('/admin/college', async (req, res) => {
             if (cleaned.some((d) => d.length > 80)) return res.status(400).json({ error: 'Department names are limited to 80 characters' });
             next.departments = cleaned;
         }
+        for (const [key, label] of [['brand_primary', 'Primary color'], ['brand_secondary', 'Secondary color']]) {
+            if (req.body[key] === undefined) continue;
+            const parsed = parseBrandColor(req.body[key], label);
+            if (parsed.error) return res.status(400).json({ error: parsed.error });
+            next[key] = parsed.value;
+        }
+        if (tagline !== undefined) {
+            if (tagline !== null && typeof tagline !== 'string') return res.status(400).json({ error: 'Tagline must be text' });
+            const t = (tagline || '').trim();
+            if (t.length > 120) return res.status(400).json({ error: 'Tagline is limited to 120 characters' });
+            next.tagline = t || null;
+        }
         if (require_verified_handles !== undefined) {
             if (typeof require_verified_handles !== 'boolean') {
                 return res.status(400).json({ error: 'require_verified_handles must be a boolean' });
@@ -178,10 +193,13 @@ router.patch('/admin/college', async (req, res) => {
         }
 
         const { rows } = await pool.query(
-            `UPDATE colleges SET name = $2, logo_url = $3, email_domains = $4, require_verified_handles = $5, departments = $6
+            `UPDATE colleges SET name = $2, logo_url = $3, email_domains = $4, require_verified_handles = $5, departments = $6,
+                    brand_primary = $7, brand_secondary = $8, tagline = $9
              WHERE college_id = $1
-             RETURNING slug, name, logo_url, email_domains, require_verified_handles, departments`,
-            [req.college.college_id, next.name, next.logo_url, next.email_domains, next.require_verified_handles, next.departments]
+             RETURNING slug, name, logo_url, email_domains, require_verified_handles, departments,
+                       brand_primary, brand_secondary, tagline, custom_domain`,
+            [req.college.college_id, next.name, next.logo_url, next.email_domains, next.require_verified_handles, next.departments,
+             next.brand_primary, next.brand_secondary, next.tagline]
         );
         res.json(rows[0]);
     } catch (err) {

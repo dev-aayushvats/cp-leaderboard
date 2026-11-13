@@ -4,9 +4,10 @@ A competitive-programming leaderboard that colleges can host for their students.
 Students sign up with a college email (OTP, no passwords), link their LeetCode /
 Codeforces handles, and see rankings among their peers.
 
-Each deployment serves one **college (tenant)**. Users, leaderboards and login
-tokens are fully isolated per college, and sign-up can be restricted to the
-college's email domains.
+One codebase serves **many colleges (tenants)** from a single deployment. Each college
+gets its own address (`mit.yoursite.com`, or its own domain), branding, members and
+leaderboard, all isolated from each other. You can also run it for a **single college**
+with no subdomain setup. Both modes are the same code; there is nothing to fork.
 
 ```
 backend/    Express + Postgres API (routes/, middleware/, services/), SQL migrations, rating-sync worker
@@ -22,16 +23,21 @@ cp .env.example .env        # fill in DATABASE_URL, JWT_SECRET, EMAIL_USER/PASS
 npm install
 npm run migrate             # create/upgrade the schema
 npm run college:add -- mit "MIT" mit.edu     # create a college + allowed email domains
-npm run dev                 # API on :5000
+npm run admin:add -- mit you@mit.edu         # its first admin
+npm run dev                 # API on :5000 (set PORT if that's taken: macOS AirPlay uses 5000)
 ```
 
 **2. Frontend**
 ```bash
 cd frontend
-cp .env.example .env.local  # set NEXT_PUBLIC_COLLEGE_SLUG=mit
+cp .env.example .env.local  # set NEXT_PUBLIC_API_BASE_URL to the API above
 npm install
 npm run dev                 # app on :3000
 ```
+The college is chosen by the **hostname** you browse to, so one frontend serves every
+college. Try it locally with no setup: `http://mit.localhost:3000` shows MIT. For a
+single-college install, either set `DEFAULT_COLLEGE_SLUG=mit` in the backend (then any
+hostname shows MIT) or pin the frontend with `NEXT_PUBLIC_COLLEGE_SLUG=mit`.
 
 **3. Sync ratings.** Ratings are pulled by a separate worker process:
 ```bash
@@ -44,16 +50,53 @@ container, ...). It shuts down cleanly on SIGTERM. See [The sync worker](#the-sy
 
 ## Colleges
 
+Colleges are created by the platform operator (there is no self-signup for colleges):
 ```bash
-npm run college:add -- <slug> "<Display Name>" [domain1,domain2]
+npm run college:add -- <slug> "<Display Name>" [domain1,domain2] [--custom-domain=cp.college.edu]
 ```
+- `slug` becomes the subdomain (`<slug>.<ROOT_DOMAIN>`): lowercase letters, digits, hyphens.
+  Names like `www`, `api`, `admin`, `mail` are reserved.
 - Email domains match subdomains too (`mit.edu` allows `cs.mit.edu`).
 - **No domains = open registration** (any email). The script warns when this is the case.
-- Re-running with an existing slug updates its name and domains.
+- Re-running with an existing slug updates its name and email domains (and the custom domain, if given).
+- Admins: `npm run admin:add -- <slug> <email>`.
 
-The frontend picks its college from `NEXT_PUBLIC_COLLEGE_SLUG` and sends it as the
-`X-College-Slug` header on every request. The backend falls back to
-`DEFAULT_COLLEGE_SLUG` if the header is absent.
+## Hosting many colleges
+
+**How a request finds its college** (first match wins):
+1. a college whose **custom domain** equals the hostname (`cp.mit.edu`);
+2. an explicit `X-College-Slug` header (dev/tests, or `NEXT_PUBLIC_COLLEGE_SLUG`);
+3. the subdomain: `mit.<ROOT_DOMAIN>` -> `mit` (`*.localhost` always works for local dev);
+4. `DEFAULT_COLLEGE_SLUG`, **only** if the request didn't name a college at all.
+
+A subdomain that doesn't exist (a typo) is "College not found", never someone else's
+leaderboard. The bare root domain shows a small "find your college" page.
+Members' sessions are stored per address, so logging in at `mit.…` never carries over to `iit.…`.
+
+**Setting it up on a server:**
+1. Set `ROOT_DOMAIN=leaderboard.example.com` in the backend env. Leave `DEFAULT_COLLEGE_SLUG` unset.
+2. Point wildcard DNS `*.leaderboard.example.com` (and the bare name) at the frontend, and get a
+   wildcard TLS certificate (e.g. Caddy or a DNS-challenge certificate). The frontend and API each
+   need to be reachable by browsers; set `NEXT_PUBLIC_API_BASE_URL` at build time.
+3. Leave `NEXT_PUBLIC_COLLEGE_SLUG` unset in the frontend. If the frontend server reaches the API
+   at a different address than browsers do (e.g. a docker network), set `API_INTERNAL_URL`.
+4. Behind a reverse proxy, set `TRUST_PROXY` (see Security notes) and forward the original `Host`
+   (or `X-Forwarded-Host`) header to the frontend.
+5. Create colleges with `college:add`. They go live immediately at `<slug>.leaderboard.example.com`.
+
+**Custom domains** (e.g. `cp.mit.edu`): the college points a DNS `CNAME` at your frontend, you add the
+domain to your TLS setup, then run `college:add -- mit "MIT" mit.edu --custom-domain=cp.mit.edu`.
+Custom domains are operator-set on purpose: a college admin can't claim a domain by typing it.
+
+## Branding
+
+College admins customise their leaderboard in the admin panel (College settings -> Branding):
+**name, logo (an image URL), tagline, and two brand colors**, with a live preview. The theme and
+page title are applied in the first HTML the server sends, so there is no flash of default colors.
+Colors must stay readable on the dark background (WCAG AA, 4.5:1); the form and the API both
+reject colors that are too dark. Each platform keeps its own identity color (LeetCode blue, ...)
+regardless of the brand, and "Reset colors" returns to the defaults. Without a logo, the college's
+initials are shown.
 
 ## Platforms
 
