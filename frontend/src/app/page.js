@@ -4,11 +4,14 @@ import LeaderboardTable from "@/components/LeaderboardTable";
 import Link from "next/link";
 import useAuthStore from "@/store/useAuthStore"; // Import Zustand store
 import { LogOut } from "lucide-react";
+import useCollege from "@/utils/useCollege";
+import CollegeLogo from "@/components/CollegeLogo";
 import { Settings as SettingsIcon, ShieldCheck } from "lucide-react";
 
 export default function Home() {
   // Zustand Hooks
   const { user, logout } = useAuthStore();
+  const college = useCollege();
 
   // Hydration fix: Ensure we only show auth state after client loads
   const [isHydrated, setIsHydrated] = useState(false);
@@ -21,21 +24,25 @@ export default function Home() {
 
 
   return (
-    <main className="min-h-screen bg-dark-bg text-gray-200 relative overflow-x-hidden selection:bg-pastel-blue/20">
+    <main className="min-h-screen bg-dark-bg text-gray-200 relative overflow-x-hidden selection:bg-brand/20">
 
       {/* Background Ambience (Fixed position so they don't scroll away) */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-pastel-blue/5 rounded-full blur-[128px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-brand/5 rounded-full blur-[128px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-pastel-red/5 rounded-full blur-[128px]" />
       </div>
 
       {/* Header with User Profile */}
-      <div className="relative z-50 p-6 flex justify-end">
+      <div className="relative z-50 p-6 flex items-center justify-between gap-4">
+        <Link href="/" className="flex items-center gap-3 min-w-0">
+          <CollegeLogo college={college} size={32} />
+          <span className="text-sm font-bold text-gray-200 truncate hidden sm:block">{college?.name}</span>
+        </Link>
         {isHydrated && user ? (
           <div className="flex items-center gap-4">
             {/* ... User Logged In UI ... */}
             <span className="text-xs text-gray-500">
-              Logged in as <span className="text-pastel-blue">{user.username}</span>
+              Logged in as <span className="text-brand">{user.username}</span>
             </span>
               {user.role === "college_admin" && (
                 <Link href="/admin" className="p-2 hover:bg-white/10 rounded-full text-pastel-green/80 hover:text-pastel-green transition-colors" title="Admin panel">

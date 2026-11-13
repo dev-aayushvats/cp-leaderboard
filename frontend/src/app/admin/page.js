@@ -12,6 +12,8 @@ import {
 } from "@/utils/api";
 import useCollege from "@/utils/useCollege";
 import { DEFAULT_PLATFORMS } from "@/utils/platforms";
+import { DEFAULT_BRAND, HEX, colorProblem, hexToTriplet } from "@/utils/branding";
+import CollegeLogo from "@/components/CollegeLogo";
 import { timeAgo } from "@/utils/time";
 
 const PAGE_SIZE = 25;
@@ -47,28 +49,64 @@ function Handle({ info }) {
 }
 
 // --- College settings -------------------------------------------------------
-function CollegeSettings({ onError }) {
+const inputClass = "w-full bg-dark-bg/50 border border-white/10 rounded-lg py-2 px-3 text-gray-200 focus:border-white/30 focus:outline-none text-sm";
+
+// A color picker plus a hex box, with the same readability rule the server enforces.
+function ColorField({ label, value, onChange, fallback }) {
+  const problem = colorProblem(value, label);
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] text-gray-400 uppercase font-bold">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          aria-label={`${label} picker`}
+          value={HEX.test(value) ? value : fallback}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-9 w-11 shrink-0 rounded-md bg-transparent border border-white/10 cursor-pointer p-0.5"
+        />
+        <input
+          className={`${inputClass} font-mono`}
+          aria-label={`${label} hex`}
+          value={value}
+          onChange={(e) => onChange(e.target.value.trim())}
+          placeholder={`${fallback} (default)`}
+          maxLength={7}
+        />
+      </div>
+      {problem && <p className="text-[11px] text-orange-300" role="alert">{problem}</p>}
+    </div>
+  );
+}
+
+function CollegeSettings({ onError, onSaved }) {
   const [form, setForm] = useState(null);
+  const [customDomain, setCustomDomain] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     getAdminCollege()
-      .then((res) =>
+      .then((res) => {
+        setCustomDomain(res.data.custom_domain);
         setForm({
           name: res.data.name,
           logo_url: res.data.logo_url || "",
+          tagline: res.data.tagline || "",
+          brand_primary: res.data.brand_primary || "",
+          brand_secondary: res.data.brand_secondary || "",
           domains: res.data.email_domains.join(", "),
           departments: res.data.departments.join(", "),
           require_verified_handles: res.data.require_verified_handles,
-        })
-      )
+        });
+      })
       .catch((err) => onError(errMsg(err, "Failed to load college settings")));
   }, [onError]);
 
   if (!form) return <div className="h-40 bg-white/5 animate-pulse rounded-xl" />;
 
   const set = (patch) => { setForm({ ...form, ...patch }); setSaved(false); };
+  const colorsInvalid = !!(colorProblem(form.brand_primary, "Primary color") || colorProblem(form.brand_secondary, "Secondary color"));
 
   const save = async (e) => {
     e.preventDefault();
@@ -78,11 +116,15 @@ function CollegeSettings({ onError }) {
       await updateAdminCollege({
         name: form.name,
         logo_url: form.logo_url,
+        tagline: form.tagline,
+        brand_primary: form.brand_primary || null,
+        brand_secondary: form.brand_secondary || null,
         email_domains: form.domains.split(",").map((d) => d.trim()).filter(Boolean),
         departments: form.departments.split(",").map((d) => d.trim()).filter(Boolean),
         require_verified_handles: form.require_verified_handles,
       });
       setSaved(true);
+      onSaved?.(); // re-render the server layout so the new name/colors/logo apply right away
     } catch (err) {
       onError(errMsg(err, "Failed to save settings"));
     } finally {
@@ -90,48 +132,95 @@ function CollegeSettings({ onError }) {
     }
   };
 
-  const input = "w-full bg-dark-bg/50 border border-white/10 rounded-lg py-2 px-3 text-gray-200 focus:border-white/30 focus:outline-none text-sm";
+  // Preview scoped to the unsaved colors: the brand classes read these CSS variables
+  const previewStyle = {
+    "--brand": hexToTriplet(form.brand_primary) || hexToTriplet(DEFAULT_BRAND.primary),
+    "--brand-2": hexToTriplet(form.brand_secondary) || hexToTriplet(DEFAULT_BRAND.secondary),
+  };
 
   return (
-    <form onSubmit={save} className="bg-white/[0.03] border border-white/10 rounded-xl p-5 space-y-4">
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <label className="text-[10px] text-gray-400 uppercase font-bold">College name</label>
-          <input className={input} value={form.name} onChange={(e) => set({ name: e.target.value })} required />
+    <form onSubmit={save} className="bg-white/[0.03] border border-white/10 rounded-xl p-5 space-y-6">
+      {/* Branding */}
+      <section className="space-y-4">
+        <h3 className="text-[11px] font-bold text-white/60 uppercase tracking-widest">Branding</h3>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 uppercase font-bold">College name</label>
+            <input className={inputClass} value={form.name} onChange={(e) => set({ name: e.target.value })} required />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 uppercase font-bold">Logo URL (optional)</label>
+            <div className="flex items-center gap-3">
+              <CollegeLogo key={form.logo_url} college={{ name: form.name, logo_url: form.logo_url }} size={36} />
+              <input className={inputClass} value={form.logo_url} onChange={(e) => set({ logo_url: e.target.value })} placeholder="https://..." />
+            </div>
+            <p className="text-[10px] text-gray-500">A square image works best. Without one, your college&apos;s initials are shown.</p>
+          </div>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] text-gray-400 uppercase font-bold">Logo URL (optional)</label>
-          <input className={input} value={form.logo_url} onChange={(e) => set({ logo_url: e.target.value })} placeholder="https://..." />
+          <label className="text-[10px] text-gray-400 uppercase font-bold">Tagline (optional)</label>
+          <input className={inputClass} value={form.tagline} onChange={(e) => set({ tagline: e.target.value })} maxLength={120} placeholder="Competitive Programming Club" />
+          <p className="text-[10px] text-gray-500">Shown under the leaderboard title. {form.tagline.length}/120</p>
         </div>
-      </div>
-      <div className="space-y-1">
-        <label className="text-[10px] text-gray-400 uppercase font-bold">Allowed sign-up email domains</label>
-        <input className={input} value={form.domains} onChange={(e) => set({ domains: e.target.value })} placeholder="college.edu, alumni.college.edu" />
+        <div className="grid md:grid-cols-2 gap-4">
+          <ColorField label="Primary color" value={form.brand_primary} onChange={(v) => set({ brand_primary: v })} fallback={DEFAULT_BRAND.primary} />
+          <ColorField label="Secondary color" value={form.brand_secondary} onChange={(v) => set({ brand_secondary: v })} fallback={DEFAULT_BRAND.secondary} />
+        </div>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div style={previewStyle} className="flex items-center gap-3 bg-dark-bg border border-white/10 rounded-lg px-4 py-3" aria-label="Preview">
+            <CollegeLogo key={form.logo_url} college={{ name: form.name, logo_url: form.logo_url }} size={32} />
+            <div>
+              <p className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand via-brand-2 to-brand leading-tight">{form.name || "Your college"} Rankings</p>
+              <p className="text-[11px] text-gray-500">{form.tagline || "/COMPETITIVE_PROGRAMMING /LEADERBOARD"}</p>
+            </div>
+            <span className="text-[10px] font-bold border border-brand/40 text-brand rounded px-1.5 py-0.5">Preview</span>
+          </div>
+          {(form.brand_primary || form.brand_secondary) && (
+            <button type="button" onClick={() => set({ brand_primary: "", brand_secondary: "" })} className="text-xs text-gray-400 hover:text-white underline underline-offset-2">
+              Reset colors to default
+            </button>
+          )}
+        </div>
         <p className="text-[10px] text-gray-500">
-          Comma-separated. Subdomains are included. {form.domains.trim() ? "" : "Empty means anyone can register."}
+          {customDomain
+            ? <>Also served at <span className="text-gray-300">{customDomain}</span>.</>
+            : <>Want your own address (e.g. cp.yourcollege.edu)? Ask the platform operator to set it up.</>}
         </p>
-      </div>
-      <div className="space-y-1">
-        <label className="text-[10px] text-gray-400 uppercase font-bold">Departments</label>
-        <input className={input} value={form.departments} onChange={(e) => set({ departments: e.target.value })} placeholder="Computer Science, Electronics, Mechanical" />
-        <p className="text-[10px] text-gray-500">
-          Comma-separated. Members pick one in their settings and the leaderboard can be filtered by it. Leave empty to turn departments off.
-        </p>
-      </div>
-      <label className="flex items-start gap-3 cursor-pointer">
-        <input
-          type="checkbox"
-          className="mt-1 accent-emerald-300"
-          checked={form.require_verified_handles}
-          onChange={(e) => set({ require_verified_handles: e.target.checked })}
-        />
-        <span className="text-xs text-gray-300">
-          Only show verified handles on the leaderboard
-          <span className="block text-[10px] text-gray-500">Members whose handle isn&apos;t verified are hidden until they verify it.</span>
-        </span>
-      </label>
+      </section>
+
+      {/* Membership */}
+      <section className="space-y-4">
+        <h3 className="text-[11px] font-bold text-white/60 uppercase tracking-widest">Membership</h3>
+        <div className="space-y-1">
+          <label className="text-[10px] text-gray-400 uppercase font-bold">Allowed sign-up email domains</label>
+          <input className={inputClass} value={form.domains} onChange={(e) => set({ domains: e.target.value })} placeholder="college.edu, alumni.college.edu" />
+          <p className="text-[10px] text-gray-500">
+            Comma-separated. Subdomains are included. {form.domains.trim() ? "" : "Empty means anyone can register."}
+          </p>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] text-gray-400 uppercase font-bold">Departments</label>
+          <input className={inputClass} value={form.departments} onChange={(e) => set({ departments: e.target.value })} placeholder="Computer Science, Electronics, Mechanical" />
+          <p className="text-[10px] text-gray-500">
+            Comma-separated. Members pick one in their settings and the leaderboard can be filtered by it. Leave empty to turn departments off.
+          </p>
+        </div>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-1 accent-emerald-300"
+            checked={form.require_verified_handles}
+            onChange={(e) => set({ require_verified_handles: e.target.checked })}
+          />
+          <span className="text-xs text-gray-300">
+            Only show verified handles on the leaderboard
+            <span className="block text-[10px] text-gray-500">Members whose handle isn&apos;t verified are hidden until they verify it.</span>
+          </span>
+        </label>
+      </section>
+
       <div className="flex items-center gap-3">
-        <button disabled={saving} className="bg-white text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2 disabled:opacity-60">
+        <button disabled={saving || colorsInvalid} className="bg-white text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2 disabled:opacity-50">
           {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save settings
         </button>
         {saved && <span className="text-xs text-pastel-green">Saved</span>}
@@ -218,7 +307,7 @@ export default function AdminPage() {
   };
 
   if (!authorized) {
-    return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-pastel-blue" /></div>;
+    return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-brand" /></div>;
   }
 
   const verifiedTotal = stats ? stats.platforms.reduce((n, p) => n + p.verified, 0) : 0;
@@ -263,7 +352,7 @@ export default function AdminPage() {
         {/* College settings */}
         <section className="space-y-3">
           <h2 className="text-xs font-bold text-white/50 uppercase tracking-widest">College settings</h2>
-          <CollegeSettings onError={setError} />
+          <CollegeSettings onError={setError} onSaved={() => router.refresh()} />
         </section>
 
         {/* Members */}

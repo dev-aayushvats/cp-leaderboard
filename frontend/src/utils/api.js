@@ -4,16 +4,25 @@ import useAuthStore from '@/store/useAuthStore';
 // Get base URL from environment variable
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
-// Which college (tenant) this deployment serves. Sent on every request.
-export const COLLEGE_SLUG = process.env.NEXT_PUBLIC_COLLEGE_SLUG || 'default';
+// Which college a request is for is normally decided by the hostname the browser is
+// on (mit.example.com -> MIT, or a college's own custom domain), so one build serves
+// every college. NEXT_PUBLIC_COLLEGE_SLUG pins a deployment to one college regardless
+// of hostname (optional: for single-college installs and local development).
+export const COLLEGE_SLUG = process.env.NEXT_PUBLIC_COLLEGE_SLUG || '';
 
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    'X-College-Slug': COLLEGE_SLUG,
+    ...(COLLEGE_SLUG ? { 'X-College-Slug': COLLEGE_SLUG } : {}),
   },
+});
+
+// Tell the API which hostname the user is on so it can pick the college
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') config.headers['X-College-Host'] = window.location.hostname;
+  return config;
 });
 
 // Request interceptor to add auth token automatically

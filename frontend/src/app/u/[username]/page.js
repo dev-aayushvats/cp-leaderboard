@@ -56,7 +56,7 @@ export default function MemberProfile() {
   );
 
   if (state.status === "loading") {
-    return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-pastel-blue" /></div>;
+    return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-brand" /></div>;
   }
   if (state.status !== "ok") {
     return (
@@ -88,8 +88,8 @@ export default function MemberProfile() {
   return (
     <main className="min-h-screen bg-dark-bg text-gray-200 font-mono relative overflow-x-hidden">
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-pastel-blue/5 rounded-full blur-[128px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-pastel-purple/5 rounded-full blur-[128px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-brand/5 rounded-full blur-[128px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-brand-2/5 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative z-10 max-w-3xl mx-auto px-4 md:px-6 py-8 space-y-8">

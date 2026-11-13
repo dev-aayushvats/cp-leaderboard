@@ -5,6 +5,10 @@
 :root {
   background: #0A0A0A;
   color: #E0E0E0;
+  /* Default brand colors (space-separated RGB so Tailwind can apply opacity).
+     A college's colors override these via the root layout. */
+  --brand: 130 177 255;
+  --brand-2: 209 196 233;
 }
 
 body {

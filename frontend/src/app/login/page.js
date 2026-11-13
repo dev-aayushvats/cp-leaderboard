@@ -6,10 +6,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useAuthStore from "@/store/useAuthStore";
 import { sendLoginOTP, loginWithOTP } from "@/utils/api";
+import useCollege from "@/utils/useCollege";
+import CollegeLogo from "@/components/CollegeLogo";
 
 export default function Login() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
+  const college = useCollege();
 
   const [step, setStep] = useState(1); // 1 = Email, 2 = OTP
   const [loading, setLoading] = useState(false);
@@ -68,6 +71,7 @@ export default function Login() {
         className="w-full max-w-sm bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl relative z-10"
       >
         <div className="mb-10 text-center">
+          <div className="flex justify-center mb-4"><CollegeLogo college={college} size={44} /></div>
           <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">
             {step === 1 ? "Welcome Back" : "Verify Login"}
           </h1>

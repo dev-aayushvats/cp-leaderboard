@@ -92,7 +92,7 @@ function HandleField({ platform, value, onChange, saved, onVerified }) {
             You can remove it afterwards.
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 bg-black/50 border border-white/10 rounded px-3 py-1.5 text-sm text-pastel-blue select-all">
+            <code className="flex-1 bg-black/50 border border-white/10 rounded px-3 py-1.5 text-sm text-brand select-all">
               {saved.verification_token}
             </code>
             <button type="button" onClick={copyCode} className="p-2 rounded border border-white/10 text-gray-400 hover:text-white hover:border-white/30 transition-colors" title="Copy code">
@@ -173,12 +173,12 @@ export default function Settings() {
     }
   };
 
-  if (initialLoading) return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-pastel-blue"/></div>;
+  if (initialLoading) return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-brand"/></div>;
 
   return (
     <main className="min-h-screen bg-dark-bg flex items-center justify-center p-4 relative font-mono">
        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-pastel-blue/5 rounded-full blur-[128px]" />
+        <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-brand/5 rounded-full blur-[128px]" />
       </div>
 
       <motion.div
@@ -205,9 +205,9 @@ export default function Settings() {
 
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label htmlFor="batch" className="text-[10px] text-pastel-purple uppercase font-bold ml-1">Batch (graduation year)</label>
+                  <label htmlFor="batch" className="text-[10px] text-brand-2 uppercase font-bold ml-1">Batch (graduation year)</label>
                   <div className="relative group">
-                    <GraduationCap className="absolute left-3 top-3 w-4 h-4 text-gray-500 group-focus-within:text-pastel-purple transition-colors" />
+                    <GraduationCap className="absolute left-3 top-3 w-4 h-4 text-gray-500 group-focus-within:text-brand-2 transition-colors" />
                     <input
                       id="batch"
                       type="number"
@@ -217,7 +217,7 @@ export default function Settings() {
                       value={formData.batch}
                       onChange={handleChange}
                       placeholder="2027"
-                      className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-gray-200 focus:border-pastel-purple/50 focus:outline-none transition-all text-sm"
+                      className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-gray-200 focus:border-brand-2/50 focus:outline-none transition-all text-sm"
                     />
                   </div>
                 </div>

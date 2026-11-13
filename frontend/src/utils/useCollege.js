@@ -1,26 +1,17 @@
-import { useEffect, useState } from "react";
-import { getCollege } from "@/utils/api";
+"use client";
+import { createContext, useContext } from "react";
 
-// Fetched once per page load and shared by every component that asks for it.
-let collegePromise = null;
+// The college for this request, resolved on the server from the hostname by the root
+// layout (see lib/college-server.js) and provided here, so components get it
+// synchronously on first render: no loading state, no flash of default branding.
+const CollegeContext = createContext(null);
+
+// A component (not the bare Context.Provider object) so the server-rendered root
+// layout can render it: Server Components can only pass components across to the client.
+export function CollegeProvider({ college, children }) {
+  return <CollegeContext.Provider value={college}>{children}</CollegeContext.Provider>;
+}
 
 export default function useCollege() {
-  const [college, setCollege] = useState(null);
-
-  useEffect(() => {
-    if (!collegePromise) {
-      collegePromise = getCollege()
-        .then((res) => res.data)
-        .catch((err) => {
-          collegePromise = null; // allow retry on next mount
-          console.error("Failed to load college info", err);
-          return null;
-        });
-    }
-    let active = true;
-    collegePromise.then((c) => active && setCollege(c));
-    return () => { active = false; };
-  }, []);
-
-  return college;
+  return useContext(CollegeContext);
 }

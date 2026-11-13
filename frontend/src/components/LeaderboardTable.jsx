@@ -19,7 +19,7 @@ const ShimmerHeader = ({ title }) => {
       </h1>
       {/* Overlay Text (Animated Gradient) */}
       <motion.h1
-        className="text-4xl md:text-5xl font-bold tracking-tight absolute top-0 left-0 text-transparent bg-clip-text bg-gradient-to-r from-pastel-blue via-pastel-purple to-pastel-blue"
+        className="text-4xl md:text-5xl font-bold tracking-tight absolute top-0 left-0 text-transparent bg-clip-text bg-gradient-to-r from-brand via-brand-2 to-brand"
         animate={{
           backgroundPosition: ["0% center", "200% center"],
         }}
@@ -37,7 +37,7 @@ const ShimmerHeader = ({ title }) => {
 };
 
 const selectClass =
-  "bg-black/50 border border-white/10 rounded px-3 py-2 text-xs text-white focus:border-pastel-blue outline-none";
+  "bg-black/50 border border-white/10 rounded px-3 py-2 text-xs text-white focus:border-brand outline-none";
 
 // --- MAIN COMPONENT ---
 export default function LeaderboardTable() {
@@ -92,7 +92,7 @@ export default function LeaderboardTable() {
         <div>
           <ShimmerHeader title={college ? `${college.name} Rankings` : "Rankings"} />
           <p className="text-gray-500 mt-2 font-mono text-xs md:text-sm tracking-wider">
-            /COMPETITIVE_PROGRAMMING /LEADERBOARD
+            {college?.tagline || "/COMPETITIVE_PROGRAMMING /LEADERBOARD"}
           </p>
           {canFilter && (
             <div className="mt-4 flex gap-2">
@@ -166,7 +166,7 @@ export default function LeaderboardTable() {
           <div className="col-span-2 text-right text-gray-400">
             {st.secondary === "solved" ? "Questions" : "Peak Rating"}
           </div>
-          <div className="col-span-3 text-right text-pastel-blue/80">Current Rating</div>
+          <div className="col-span-3 text-right text-brand/80">Current Rating</div>
         </div>
 
         {/* Table Body */}
@@ -285,7 +285,7 @@ export default function LeaderboardTable() {
           {!loading && error && (
             <div className="p-12 text-center border border-dashed border-red-500/30 rounded-lg bg-red-500/[0.03]">
               <p className="text-gray-300 font-mono text-sm">Couldn&apos;t load the rankings.</p>
-              <button onClick={retry} className="mt-3 text-xs text-pastel-blue hover:underline">Try again</button>
+              <button onClick={retry} className="mt-3 text-xs text-brand hover:underline">Try again</button>
             </div>
           )}
 

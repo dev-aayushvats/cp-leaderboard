@@ -11,6 +11,10 @@ module.exports = {
           card: '#121212',
           border: '#2A2A2A',
         },
+        // Per-college brand colors (set from CSS variables by the root layout).
+        // `pastel.*` stays fixed: LeetCode/Codeforces/AtCoder identity + status colors.
+        brand: 'rgb(var(--brand) / <alpha-value>)',
+        'brand-2': 'rgb(var(--brand-2) / <alpha-value>)',
         pastel: {
           red: '#FF8A80',
           green: '#B9F6CA',
