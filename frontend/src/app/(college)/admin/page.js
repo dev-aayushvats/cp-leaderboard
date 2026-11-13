@@ -60,7 +60,7 @@ function ShareCard({ college }) {
       <Link2 className="w-4 h-4 text-brand shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="text-[10px] text-gray-500 uppercase tracking-widest">Your college link</p>
-        <p className="text-sm text-gray-200 truncate select-all">{url || "…"}</p>
+        <p className="text-sm text-gray-200 break-all select-all">{url || "…"}</p>
         <p className="text-[11px] text-gray-500">
           {domains.length ? `Students sign up with a ${domains.map((d) => "@" + d).join(" or ")} address.` : "Registration is open to any email address."}
         </p>
@@ -511,7 +511,7 @@ export default function AdminPage() {
                 value={filters[key]}
                 onChange={(e) => changeFilter({ [key]: e.target.value })}
                 aria-label={all.replace(/^All |^Any /, "Filter by ")}
-                className={`bg-dark-bg/50 border rounded-lg py-1.5 px-2 text-xs text-gray-200 focus:outline-none focus:border-white/30 ${filters[key] ? "border-brand/50" : "border-white/10"}`}
+                className={`bg-dark-bg/50 border rounded-lg py-1.5 pl-3 text-xs text-gray-200 focus:outline-none focus:border-white/30 ${filters[key] ? "border-brand/50" : "border-white/10"}`}
               >
                 <option value="">{all}</option>
                 {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -542,7 +542,7 @@ export default function AdminPage() {
                     <div className="min-w-0">
                       <div className="font-bold text-gray-200 text-sm truncate">
                         {u.username}
-                        {u.role === "college_admin" && <span className="ml-2 text-[9px] text-pastel-green border border-pastel-green/30 rounded px-1">ADMIN</span>}
+                        {u.role === "college_admin" && <span className="ml-2 text-[10px] text-pastel-green border border-pastel-green/30 rounded px-1.5 py-px">ADMIN</span>}
                       </div>
                       <div className="text-[11px] text-gray-500 truncate">{u.email}</div>
                       {(u.department || u.batch) && (
@@ -554,7 +554,7 @@ export default function AdminPage() {
                   <dl className="grid grid-cols-3 gap-2 text-[11px]">
                     {platformList.map((p) => (
                       <div key={p.id}>
-                        <dt className="text-[9px] text-gray-500 uppercase tracking-widest">{p.label}</dt>
+                        <dt className="text-[10px] text-gray-500 uppercase tracking-widest">{p.label}</dt>
                         <dd className="text-gray-300 truncate"><Handle info={u.handles?.[p.id]} /></dd>
                       </div>
                     ))}
@@ -601,7 +601,7 @@ export default function AdminPage() {
                         <div className="font-bold text-gray-200">
                           {u.username}
                           {u.role === "college_admin" && (
-                            <span className="ml-2 text-[9px] text-pastel-green border border-pastel-green/30 rounded px-1">ADMIN</span>
+                            <span className="ml-2 text-[10px] text-pastel-green border border-pastel-green/30 rounded px-1.5 py-px">ADMIN</span>
                           )}
                         </div>
                         <div className="text-[11px] text-gray-500">{u.email}</div>

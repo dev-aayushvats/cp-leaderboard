@@ -53,7 +53,7 @@ function SortHead({ k, sort, onSort, className, children }) {
 }
 
 const selectClass =
-  "bg-black/50 border border-white/10 rounded px-3 py-2 text-xs text-white focus:border-brand outline-none";
+  "bg-black/50 border border-white/10 rounded-lg pl-3 py-2 text-xs text-white focus:border-brand outline-none";
 
 // --- MAIN COMPONENT ---
 export default function LeaderboardTable() {
@@ -133,18 +133,6 @@ export default function LeaderboardTable() {
           <p className="text-gray-500 mt-2 font-mono text-xs md:text-sm tracking-wider">
             {college?.tagline || "/COMPETITIVE_PROGRAMMING /LEADERBOARD"}
           </p>
-          {canFilter && (
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-mono border transition-all ${
-                  showFilters ? "bg-white text-black border-white" : "bg-transparent text-gray-500 border-white/10 hover:border-white/30"
-                }`}
-              >
-                <Filter className="w-3 h-3" /> Filters{activeFilters > 0 && ` (${activeFilters})`}
-              </button>
-            </div>
-          )}
         </div>
 
       </div>
@@ -184,32 +172,18 @@ export default function LeaderboardTable() {
             </button>
           )}
         </div>
+        {canFilter && (
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            aria-expanded={showFilters}
+            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm border transition-all ${
+              showFilters || activeFilters > 0 ? "bg-white/10 text-white border-white/30" : "bg-white/5 text-gray-400 border-white/10 hover:border-white/30"
+            }`}
+          >
+            <Filter className="w-4 h-4" /> Filters{activeFilters > 0 && ` (${activeFilters})`}
+          </button>
+        )}
       </div>
-
-      {me && !loading && !error && (
-        <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-brand/30 bg-brand/5 text-sm">
-          {mine >= 0 ? (
-            <>
-              <span className="text-gray-300">
-                Your rank <span className="font-bold text-white">#{mine + 1}</span> of {data.length}
-                <span className="text-gray-500"> · rating </span>
-                <span className={`font-mono font-bold ${st.text}`}>{data[mine].rating}</span>
-              </span>
-              <button
-                onClick={() => { setQuery(""); setTimeout(() => document.getElementById("my-row")?.scrollIntoView({ block: "center", behavior: "smooth" }), 50); }}
-                className="text-xs text-brand hover:underline shrink-0"
-              >
-                Jump to me
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="text-gray-400">You aren&apos;t ranked on this platform yet.</span>
-              <Link href="/settings" className="text-xs text-brand hover:underline shrink-0">Add your handle</Link>
-            </>
-          )}
-        </div>
-      )}
 
       {/* FILTER BAR (Collapsible) */}
       <AnimatePresence>
@@ -242,6 +216,31 @@ export default function LeaderboardTable() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {me && !loading && !error && (
+        <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-brand/30 bg-brand/5 text-sm">
+          {mine >= 0 ? (
+            <>
+              <span className="text-gray-300">
+                Your rank <span className="font-bold text-white">#{mine + 1}</span> of {data.length}
+                <span className="text-gray-500"> · rating </span>
+                <span className={`font-mono font-bold ${st.text}`}>{data[mine].rating}</span>
+              </span>
+              <button
+                onClick={() => { setQuery(""); setTimeout(() => document.getElementById("my-row")?.scrollIntoView({ block: "center", behavior: "smooth" }), 50); }}
+                className="text-xs text-brand hover:underline shrink-0"
+              >
+                Jump to me
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-gray-400">You aren&apos;t ranked on this platform yet.</span>
+              <Link href="/settings" className="text-xs text-brand hover:underline shrink-0">Add your handle</Link>
+            </>
+          )}
+        </div>
+      )}
 
       {/* --- TABLE SECTION --- */}
       <div className="relative">
@@ -314,7 +313,7 @@ export default function LeaderboardTable() {
                           className="font-bold text-gray-200 text-sm tracking-tight group-hover:text-white hover:underline underline-offset-2 transition-colors truncate"
                         >
                           {user.username}
-                          {isMe(user) && <span className="ml-2 text-[9px] font-bold uppercase tracking-wider text-brand border border-brand/40 rounded px-1 align-middle">You</span>}
+                          {isMe(user) && <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-brand border border-brand/40 rounded px-1.5 py-px align-middle">You</span>}
                         </Link>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] text-gray-500 font-mono tracking-wider uppercase">
@@ -324,10 +323,10 @@ export default function LeaderboardTable() {
                             <BadgeCheck className="w-3 h-3 text-pastel-green" title="Verified handle" />
                           )}
                           {user.department && (
-                            <span className="text-[9px] text-gray-400 border border-white/10 px-1 rounded">{user.department}</span>
+                            <span className="text-[10px] text-gray-400 border border-white/10 px-1.5 py-px rounded">{user.department}</span>
                           )}
                           {user.batch && (
-                            <span className="text-[9px] text-gray-400 border border-white/10 px-1 rounded">&apos;{String(user.batch).slice(-2)}</span>
+                            <span className="text-[10px] text-gray-400 border border-white/10 px-1.5 py-px rounded">&apos;{String(user.batch).slice(-2)}</span>
                           )}
                         </div>
                         <span className="md:hidden text-[11px] text-gray-500 font-mono mt-0.5">
