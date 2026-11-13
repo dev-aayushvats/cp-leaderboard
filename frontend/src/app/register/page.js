@@ -1,17 +1,20 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Mail, Code2, Terminal, ArrowRight, Loader2, KeyRound } from "lucide-react"; // Add KeyRound
+import { User, Mail, GraduationCap, Building2, ArrowRight, Loader2, KeyRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import useAuthStore from "@/store/useAuthStore";
 import { sendOTP, registerWithOTP } from "@/utils/api";
 import useCollege from "@/utils/useCollege";
+import { styleFor, DEFAULT_PLATFORMS } from "@/utils/platforms";
 
 export default function Register() {
     const router = useRouter();
     const login = useAuthStore((state) => state.login);
     const college = useCollege();
     const domains = college?.email_domains ?? [];
+    const platformList = college?.platforms ?? DEFAULT_PLATFORMS;
+    const departments = college?.departments ?? [];
     
     const [step, setStep] = useState(1); // 1 = Details, 2 = OTP
     const [loading, setLoading] = useState(false);
@@ -19,13 +22,17 @@ export default function Register() {
     const [formData, setFormData] = useState({
         username: "",
         email: "",
-        leetcodeHandle: "",
-        codeforcesHandle: "",
-        otp: "" // New field
+        batch: "",
+        department: "",
+        handles: {}, // { [platformId]: handle }
+        otp: ""
     });
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+    const setHandle = (id, value) => {
+        setFormData({ ...formData, handles: { ...formData.handles, [id]: value } });
     };
 
     // STEP 1: Send OTP
@@ -48,7 +55,11 @@ export default function Register() {
         e.preventDefault();
         setLoading(true);
         try {
-        const res = await registerWithOTP(formData);
+        const res = await registerWithOTP({
+            ...formData,
+            batch: formData.batch === "" ? null : Number(formData.batch),
+            department: formData.department || null,
+        });
         login(res.data.token, res.data.user);
         router.push("/");
         } catch (err) {
@@ -99,18 +110,46 @@ export default function Register() {
                   <input type="email" name="email" placeholder={domains.length ? `Email (${domains.map((d) => "@" + d).join(" / ")})` : "Email Address"} required onChange={handleChange} className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-pastel-purple/50 outline-none transition-all text-sm" />
                 </div>
                 
+                {/* College info (optional) */}
+                <div className="pt-2 border-t border-white/5">
+                  <p className="text-[10px] text-gray-500 uppercase mb-3">College info (optional)</p>
+                  <div className={`grid gap-3 ${departments.length > 0 ? "grid-cols-2" : "grid-cols-1"}`}>
+                    <div className="relative group">
+                      <GraduationCap className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-pastel-purple transition-colors" />
+                      <input type="number" name="batch" min="1990" max="2100" placeholder="Batch (e.g. 2027)" aria-label="Batch (graduation year)" onChange={handleChange} className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-pastel-purple/50 outline-none transition-all text-sm" />
+                    </div>
+                    {departments.length > 0 && (
+                      <div className="relative group">
+                        <Building2 className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-pastel-green transition-colors" />
+                        <select name="department" aria-label="Department" defaultValue="" onChange={handleChange} className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-pastel-green/50 outline-none transition-all text-sm">
+                          <option value="">Department</option>
+                          {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Platform Handles */}
                 <div className="pt-2 border-t border-white/5">
                    <p className="text-[10px] text-gray-500 uppercase mb-3">Link Accounts</p>
                    <div className="space-y-3">
-                     <div className="relative group">
-                       <Code2 className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-pastel-blue transition-colors" />
-                       <input type="text" name="leetcodeHandle" placeholder="LeetCode Username" onChange={handleChange} className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-pastel-blue/50 outline-none transition-all text-sm" />
-                     </div>
-                     <div className="relative group">
-                       <Terminal className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-pastel-red transition-colors" />
-                       <input type="text" name="codeforcesHandle" placeholder="Codeforces Handle" onChange={handleChange} className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-pastel-red/50 outline-none transition-all text-sm" />
-                     </div>
+                     {platformList.map(({ id, label }) => {
+                       const { Icon } = styleFor(id);
+                       return (
+                         <div key={id} className="relative group">
+                           <Icon className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-white transition-colors" />
+                           <input
+                             type="text"
+                             aria-label={`${label} username`}
+                             placeholder={`${label} username`}
+                             value={formData.handles[id] || ""}
+                             onChange={(e) => setHandle(id, e.target.value)}
+                             className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-white/30 outline-none transition-all text-sm"
+                           />
+                         </div>
+                       );
+                     })}
                    </div>
                 </div>
               </motion.div>

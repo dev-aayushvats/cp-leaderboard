@@ -49,7 +49,7 @@ api.interceptors.response.use(
 
 /**
  * Get public info about this deployment's college (name, logo, allowed email domains)
- * @returns {Promise} Axios response: { slug, name, logo_url, email_domains }
+ * @returns {Promise} Axios response: { slug, name, logo_url, email_domains, departments, batches, platforms }
  */
 export const getCollege = () => {
   return api.get('/college');
@@ -91,8 +91,9 @@ export const sendOTP = (email) => {
  * @param {Object} data - Registration data
  * @param {string} data.username - Username
  * @param {string} data.email - User email
- * @param {string} data.leetcodeHandle - LeetCode handle (optional)
- * @param {string} data.codeforcesHandle - Codeforces handle (optional)
+ * @param {Object} data.handles - { [platformId]: handle } (all optional)
+ * @param {number|string} data.batch - Graduation year (optional)
+ * @param {string} data.department - One of the college's departments (optional)
  * @param {string} data.otp - OTP code
  * @returns {Promise} Axios response with token and user data
  */
@@ -113,10 +114,9 @@ export const getProfile = () => {
 /**
  * Update user profile
  * @param {Object} data - Profile data to update
- * @param {string} data.country - Country (optional)
- * @param {string} data.state - State (optional)
- * @param {string} data.leetcodeHandle - LeetCode handle (optional)
- * @param {string} data.codeforcesHandle - Codeforces handle (optional)
+ * @param {number|null} data.batch - Graduation year; null clears it, omit to leave unchanged
+ * @param {string|null} data.department - A college department; null clears it
+ * @param {Object} data.handles - { [platformId]: handle }. A different handle resets that platform's stats.
  * @returns {Promise} Axios response
  */
 export const updateProfile = (data) => {
@@ -154,21 +154,30 @@ export const updateAdminCollege = (data) => api.patch('/admin/college', data);
 
 /**
  * Get leaderboard data
- * @param {string} platform - Platform name ('leetcode' or 'codeforces')
+ * @param {string} platform - Platform id (see getCollege().platforms)
  * @param {Object} filters - Optional filters
- * @param {string} filters.country - Filter by country
- * @param {string} filters.state - Filter by state
+ * @param {string|number} filters.batch - Filter by graduation year
+ * @param {string} filters.department - Filter by department
  * @returns {Promise} Axios response with leaderboard array
  */
 export const getLeaderboard = (platform, filters = {}) => {
   const params = new URLSearchParams();
-  if (filters.country) params.append('country', filters.country);
-  if (filters.state) params.append('state', filters.state);
+  if (filters.batch) params.append('batch', filters.batch);
+  if (filters.department) params.append('department', filters.department);
 
   const queryString = params.toString();
   const url = `/leaderboard/${platform}${queryString ? `?${queryString}` : ''}`;
   
   return api.get(url);
+};
+
+/**
+ * Public member profile: ratings, rank in the college and rating history per platform.
+ * @param {string} username - Display name (URL-encoded for you)
+ * @returns {Promise} Axios response (404 if there is no such member)
+ */
+export const getUserProfile = (username) => {
+  return api.get(`/users/${encodeURIComponent(username)}`);
 };
 
 // Export the axios instance for custom requests if needed

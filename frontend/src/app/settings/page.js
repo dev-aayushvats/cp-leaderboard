@@ -1,19 +1,17 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Globe, Save, ArrowLeft, Code2, Terminal, Loader2, BadgeCheck, ShieldAlert, Copy, Check } from "lucide-react";
+import { GraduationCap, Building2, Save, ArrowLeft, Loader2, BadgeCheck, ShieldAlert, Copy, Check, ExternalLink, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import useRequireAuth from "@/store/useRequireAuth";
 import { getProfile, updateProfile, verifyHandle } from "@/utils/api";
-
-const PLATFORMS = {
-  leetcode: { label: "LeetCode Username", field: "leetcodeHandle", Icon: Code2 },
-  codeforces: { label: "Codeforces Handle", field: "codeforcesHandle", Icon: Terminal },
-};
+import useCollege from "@/utils/useCollege";
+import { styleFor, DEFAULT_PLATFORMS } from "@/utils/platforms";
 
 // One linked platform: input + verification status + proof instructions.
 function HandleField({ platform, value, onChange, saved, onVerified }) {
-  const { label, field, Icon } = PLATFORMS[platform];
+  const { id, label } = platform;
+  const { Icon } = styleFor(id);
   const [verifying, setVerifying] = useState(false);
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
@@ -35,7 +33,7 @@ function HandleField({ platform, value, onChange, saved, onVerified }) {
     setVerifying(true);
     setMessage("");
     try {
-      await verifyHandle(platform);
+      await verifyHandle(id);
       await onVerified();
     } catch (err) {
       setMessage(err.response?.data?.error || "Verification failed. Try again.");
@@ -47,7 +45,7 @@ function HandleField({ platform, value, onChange, saved, onVerified }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-[10px] text-gray-400 uppercase font-bold ml-1">{label}</label>
+        <label htmlFor={`handle-${id}`} className="text-[10px] text-gray-400 uppercase font-bold ml-1">{label} username</label>
         {isSaved && saved.verified && (
           <span className="flex items-center gap-1 text-[10px] text-pastel-green font-bold uppercase">
             <BadgeCheck className="w-3 h-3" /> Verified
@@ -63,13 +61,25 @@ function HandleField({ platform, value, onChange, saved, onVerified }) {
       <div className="relative group">
         <Icon className="absolute left-3 top-3 w-4 h-4 text-gray-500 group-focus-within:text-white transition-colors" />
         <input
+          id={`handle-${id}`}
           type="text"
-          name={field}
           value={value}
           onChange={onChange}
           className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-gray-200 focus:border-white/30 focus:outline-none transition-all text-sm font-mono"
         />
       </div>
+
+      {isSaved && saved.sync_error && (
+        <p className="flex items-start gap-1.5 text-[11px] text-orange-300 ml-1" role="alert">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+          <span>
+            We couldn&apos;t find this account on {label}. Check the spelling, then save.{" "}
+            <a href={saved.profile_url} target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-0.5">
+              Open it <ExternalLink className="w-3 h-3" />
+            </a>
+          </span>
+        </p>
+      )}
 
       {saved && !isSaved && value.trim() && (
         <p className="text-[10px] text-gray-500 ml-1">Save changes to link this handle, then verify it.</p>
@@ -106,27 +116,24 @@ function HandleField({ platform, value, onChange, saved, onVerified }) {
 
 export default function Settings() {
   const ready = useRequireAuth();
+  const college = useCollege();
+  const platformList = college?.platforms ?? DEFAULT_PLATFORMS;
+  const departments = college?.departments ?? [];
 
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [status, setStatus] = useState("");
-  const [saved, setSaved] = useState({ leetcode: null, codeforces: null }); // server-side handle info
+  const [saved, setSaved] = useState({}); // server-side handle info, by platform id
 
-  const [formData, setFormData] = useState({
-    country: "",
-    state: "",
-    leetcodeHandle: "",
-    codeforcesHandle: "",
-  });
+  const [formData, setFormData] = useState({ batch: "", department: "", handles: {} });
 
   const loadProfile = useCallback(async () => {
     const res = await getProfile();
     setSaved(res.data.handles);
     setFormData({
-      country: res.data.country || "",
-      state: res.data.state || "",
-      leetcodeHandle: res.data.handles.leetcode?.handle || "",
-      codeforcesHandle: res.data.handles.codeforces?.handle || "",
+      batch: res.data.batch ?? "",
+      department: res.data.department || "",
+      handles: Object.fromEntries(Object.entries(res.data.handles).map(([id, h]) => [id, h?.handle || ""])),
     });
   }, []);
 
@@ -141,13 +148,21 @@ export default function Settings() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setStatus("");
   };
+  const setHandle = (id, value) => {
+    setFormData({ ...formData, handles: { ...formData.handles, [id]: value } });
+    setStatus("");
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setStatus("");
     try {
-      await updateProfile(formData);
+      await updateProfile({
+        batch: formData.batch === "" ? null : Number(formData.batch),
+        department: formData.department || null,
+        handles: formData.handles,
+      });
       await loadProfile(); // stay on the page so new handles can be verified right away
       setStatus("Saved. Verify any new handle below to show the verified badge. Ratings refresh in a few hours.");
     } catch (err) {
@@ -182,42 +197,49 @@ export default function Settings() {
 
         <form onSubmit={handleSubmit} className="space-y-8">
 
-          {/* SECTION 1: Personal Info */}
+          {/* SECTION 1: College info */}
           <div className="space-y-4">
              <h2 className="text-xs font-bold text-white/50 uppercase tracking-widest border-b border-white/5 pb-2">
-                Regional Info
+                College Info
              </h2>
 
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                <label className="text-[10px] text-pastel-purple uppercase font-bold ml-1">Country</label>
-                <div className="relative group">
-                    <Globe className="absolute left-3 top-3 w-4 h-4 text-gray-500 group-focus-within:text-pastel-purple transition-colors" />
+                  <label htmlFor="batch" className="text-[10px] text-pastel-purple uppercase font-bold ml-1">Batch (graduation year)</label>
+                  <div className="relative group">
+                    <GraduationCap className="absolute left-3 top-3 w-4 h-4 text-gray-500 group-focus-within:text-pastel-purple transition-colors" />
                     <input
-                    type="text"
-                    name="country"
-                    value={formData.country}
-                    onChange={handleChange}
-                    placeholder="India"
-                    className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-gray-200 focus:border-pastel-purple/50 focus:outline-none transition-all text-sm"
+                      id="batch"
+                      type="number"
+                      name="batch"
+                      min="1990"
+                      max="2100"
+                      value={formData.batch}
+                      onChange={handleChange}
+                      placeholder="2027"
+                      className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-gray-200 focus:border-pastel-purple/50 focus:outline-none transition-all text-sm"
                     />
-                </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                <label className="text-[10px] text-pastel-green uppercase font-bold ml-1">State</label>
-                <div className="relative group">
-                    <MapPin className="absolute left-3 top-3 w-4 h-4 text-gray-500 group-focus-within:text-pastel-green transition-colors" />
-                    <input
-                    type="text"
-                    name="state"
-                    value={formData.state}
-                    onChange={handleChange}
-                    placeholder="Karnataka"
-                    className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-gray-200 focus:border-pastel-green/50 focus:outline-none transition-all text-sm"
-                    />
-                </div>
-                </div>
+                {departments.length > 0 && (
+                  <div className="space-y-2">
+                    <label htmlFor="department" className="text-[10px] text-pastel-green uppercase font-bold ml-1">Department</label>
+                    <div className="relative group">
+                      <Building2 className="absolute left-3 top-3 w-4 h-4 text-gray-500 group-focus-within:text-pastel-green transition-colors" />
+                      <select
+                        id="department"
+                        name="department"
+                        value={formData.department}
+                        onChange={handleChange}
+                        className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-gray-200 focus:border-pastel-green/50 focus:outline-none transition-all text-sm"
+                      >
+                        <option value="">Not set</option>
+                        {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
              </div>
           </div>
 
@@ -231,13 +253,13 @@ export default function Settings() {
              </p>
 
              <div className="space-y-6">
-                {Object.keys(PLATFORMS).map((platform) => (
+                {platformList.map((platform) => (
                   <HandleField
-                    key={platform}
+                    key={platform.id}
                     platform={platform}
-                    value={formData[PLATFORMS[platform].field]}
-                    onChange={handleChange}
-                    saved={saved[platform]}
+                    value={formData.handles[platform.id] || ""}
+                    onChange={(e) => setHandle(platform.id, e.target.value)}
+                    saved={saved[platform.id]}
                     onVerified={loadProfile}
                   />
                 ))}

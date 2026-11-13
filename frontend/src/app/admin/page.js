@@ -4,12 +4,15 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, ShieldCheck, Users, Search, Ban, RotateCcw, Trash2, BadgeCheck, Save, ChevronLeft, ChevronRight,
+  ArrowLeft, Loader2, ShieldCheck, Users, Search, Ban, RotateCcw, Trash2, BadgeCheck, Save, ChevronLeft, ChevronRight, AlertTriangle,
 } from "lucide-react";
 import useRequireAuth from "@/store/useRequireAuth";
 import {
   getProfile, getAdminStats, getAdminUsers, updateAdminUser, deleteAdminUser, getAdminCollege, updateAdminCollege,
 } from "@/utils/api";
+import useCollege from "@/utils/useCollege";
+import { DEFAULT_PLATFORMS } from "@/utils/platforms";
+import { timeAgo } from "@/utils/time";
 
 const PAGE_SIZE = 25;
 const errMsg = (err, fallback) => err.response?.data?.error || fallback;
@@ -24,12 +27,21 @@ function StatCard({ label, value, sub }) {
   );
 }
 
-function Handle({ handle, verified }) {
-  if (!handle) return <span className="text-gray-600">-</span>;
+// One linked handle in the members table: verified badge, and a warning if syncing it keeps failing.
+function Handle({ info }) {
+  if (!info) return <span className="text-gray-600">-</span>;
+  const problem = info.sync_error_kind === "not_found" || info.sync_failures >= 3;
   return (
     <span className="inline-flex items-center gap-1">
-      {handle}
-      {verified && <BadgeCheck className="w-3 h-3 text-pastel-green" title="Verified" />}
+      {info.handle}
+      {info.verified && <BadgeCheck className="w-3 h-3 text-pastel-green" title="Verified" />}
+      {problem && (
+        <AlertTriangle
+          className="w-3 h-3 text-orange-400"
+          title={`Sync problem: ${info.sync_error || "repeated failures"}`}
+          aria-label={`Sync problem: ${info.sync_error || "repeated failures"}`}
+        />
+      )}
     </span>
   );
 }
@@ -47,6 +59,7 @@ function CollegeSettings({ onError }) {
           name: res.data.name,
           logo_url: res.data.logo_url || "",
           domains: res.data.email_domains.join(", "),
+          departments: res.data.departments.join(", "),
           require_verified_handles: res.data.require_verified_handles,
         })
       )
@@ -66,6 +79,7 @@ function CollegeSettings({ onError }) {
         name: form.name,
         logo_url: form.logo_url,
         email_domains: form.domains.split(",").map((d) => d.trim()).filter(Boolean),
+        departments: form.departments.split(",").map((d) => d.trim()).filter(Boolean),
         require_verified_handles: form.require_verified_handles,
       });
       setSaved(true);
@@ -97,6 +111,13 @@ function CollegeSettings({ onError }) {
           Comma-separated. Subdomains are included. {form.domains.trim() ? "" : "Empty means anyone can register."}
         </p>
       </div>
+      <div className="space-y-1">
+        <label className="text-[10px] text-gray-400 uppercase font-bold">Departments</label>
+        <input className={input} value={form.departments} onChange={(e) => set({ departments: e.target.value })} placeholder="Computer Science, Electronics, Mechanical" />
+        <p className="text-[10px] text-gray-500">
+          Comma-separated. Members pick one in their settings and the leaderboard can be filtered by it. Leave empty to turn departments off.
+        </p>
+      </div>
       <label className="flex items-start gap-3 cursor-pointer">
         <input
           type="checkbox"
@@ -123,6 +144,8 @@ function CollegeSettings({ onError }) {
 export default function AdminPage() {
   const ready = useRequireAuth();
   const router = useRouter();
+  const college = useCollege();
+  const platformList = college?.platforms ?? DEFAULT_PLATFORMS;
 
   const [authorized, setAuthorized] = useState(false);
   const [error, setError] = useState("");
@@ -198,9 +221,14 @@ export default function AdminPage() {
     return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-pastel-blue" /></div>;
   }
 
-  const platform = (name) => stats?.platforms.find((p) => p.platform === name);
-  const lc = platform("leetcode");
-  const cf = platform("codeforces");
+  const verifiedTotal = stats ? stats.platforms.reduce((n, p) => n + p.verified, 0) : 0;
+  const linkedTotal = stats ? stats.platforms.reduce((n, p) => n + p.linked, 0) : 0;
+  const byPlatform = stats
+    ? stats.platforms
+        .map((p) => `${platformList.find((x) => x.id === p.platform)?.label ?? p.platform} ${p.verified}/${p.linked}`)
+        .join(" · ")
+    : "";
+  const syncedAgo = stats?.sync?.last_synced_at ? timeAgo(stats.sync.last_synced_at) : null;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const btn = "px-2.5 py-1 rounded border text-[11px] font-bold transition-colors disabled:opacity-40 flex items-center gap-1";
 
@@ -224,8 +252,12 @@ export default function AdminPage() {
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard label="Members" value={stats?.members.total ?? "–"} sub={stats && `${stats.members.active} active · ${stats.members.admins} admin`} />
           <StatCard label="Suspended" value={stats ? stats.members.total - stats.members.active : "–"} />
-          <StatCard label="LeetCode verified" value={lc ? `${lc.verified}/${lc.linked}` : "0/0"} sub="verified / linked" />
-          <StatCard label="Codeforces verified" value={cf ? `${cf.verified}/${cf.linked}` : "0/0"} sub="verified / linked" />
+          <StatCard label="Verified handles" value={stats ? `${verifiedTotal}/${linkedTotal}` : "–"} sub={byPlatform || "verified / linked"} />
+          <StatCard
+            label="Sync issues"
+            value={stats ? stats.sync.issues : "–"}
+            sub={stats ? (syncedAgo ? `last sync ${syncedAgo}` : "no sync has run yet") : undefined}
+          />
         </section>
 
         {/* College settings */}
@@ -256,8 +288,7 @@ export default function AdminPage() {
               <thead>
                 <tr className="text-left text-[10px] text-gray-500 uppercase tracking-widest border-b border-white/10">
                   <th className="px-4 py-3">Member</th>
-                  <th className="px-4 py-3">LeetCode</th>
-                  <th className="px-4 py-3">Codeforces</th>
+                  {platformList.map((p) => <th key={p.id} className="px-4 py-3">{p.label}</th>)}
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -276,9 +307,13 @@ export default function AdminPage() {
                           )}
                         </div>
                         <div className="text-[11px] text-gray-500">{u.email}</div>
+                        {(u.department || u.batch) && (
+                          <div className="text-[10px] text-gray-600 mt-0.5">{[u.department, u.batch && `Batch ${u.batch}`].filter(Boolean).join(" · ")}</div>
+                        )}
                       </td>
-                      <td className="px-4 py-3"><Handle handle={u.leetcode_handle} verified={u.leetcode_verified} /></td>
-                      <td className="px-4 py-3"><Handle handle={u.codeforces_handle} verified={u.codeforces_verified} /></td>
+                      {platformList.map((p) => (
+                        <td key={p.id} className="px-4 py-3"><Handle info={u.handles?.[p.id]} /></td>
+                      ))}
                       <td className="px-4 py-3">
                         {u.is_active
                           ? <span className="text-pastel-green">Active</span>
@@ -305,7 +340,7 @@ export default function AdminPage() {
                   );
                 })}
                 {users.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-500">No members found.</td></tr>
+                  <tr><td colSpan={platformList.length + 3} className="px-4 py-10 text-center text-gray-500">No members found.</td></tr>
                 )}
               </tbody>
             </table>
