@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Filter } from "lucide-react";
+import { Trophy, Filter, BadgeCheck } from "lucide-react";
 import { getLeaderboard } from "@/utils/api";
 import useCollege from "@/utils/useCollege";
 
@@ -216,6 +216,9 @@ export default function LeaderboardTable() {
                             <span className="text-[10px] text-gray-500 font-mono tracking-wider uppercase">
                                 @{user.platform_handle}
                             </span>
+                            {user.verified && (
+                                <BadgeCheck className="w-3 h-3 text-pastel-green" title="Verified handle" />
+                            )}
                         </div>
                       </div>
                     </div>

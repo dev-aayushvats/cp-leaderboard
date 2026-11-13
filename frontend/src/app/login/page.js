@@ -72,7 +72,7 @@ export default function Login() {
             {step === 1 ? "Welcome Back" : "Verify Login"}
           </h1>
           <p className="text-gray-500 text-xs font-mono">
-             {step === 1 ? "Enter your email to access the terminal" : `Code sent to ${formData.email}`}
+             {step === 1 ? "Enter your email to access the terminal" : `If ${formData.email} has an account, a code is on its way`}
           </p>
         </div>
 

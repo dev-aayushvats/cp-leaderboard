@@ -4,7 +4,7 @@ import LeaderboardTable from "@/components/LeaderboardTable";
 import Link from "next/link";
 import useAuthStore from "@/store/useAuthStore"; // Import Zustand store
 import { LogOut } from "lucide-react";
-import { Settings as SettingsIcon } from "lucide-react";
+import { Settings as SettingsIcon, ShieldCheck } from "lucide-react";
 
 export default function Home() {
   // Zustand Hooks
@@ -37,6 +37,11 @@ export default function Home() {
             <span className="text-xs text-gray-500">
               Logged in as <span className="text-pastel-blue">{user.username}</span>
             </span>
+              {user.role === "college_admin" && (
+                <Link href="/admin" className="p-2 hover:bg-white/10 rounded-full text-pastel-green/80 hover:text-pastel-green transition-colors" title="Admin panel">
+                    <ShieldCheck className="w-4 h-4" />
+                </Link>
+              )}
               <Link href="/settings" className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors" title="Settings">
                   <SettingsIcon className="w-4 h-4" />
               </Link>

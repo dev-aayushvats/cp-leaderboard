@@ -123,6 +123,33 @@ export const updateProfile = (data) => {
   return api.put('/profile', data);
 };
 
+/**
+ * Prove ownership of a linked handle. The user's verification code must be
+ * present in their public platform profile.
+ * @param {string} platform - 'leetcode' or 'codeforces'
+ * @returns {Promise} Axios response: { verified: true } (errors carry a helpful message)
+ */
+export const verifyHandle = (platform) => {
+  return api.post(`/profile/verify/${platform}`);
+};
+
+// ==================== ADMIN APIs (college_admin only) ====================
+
+export const getAdminStats = () => api.get('/admin/stats');
+
+/** @param {{search?: string, limit?: number, offset?: number}} params */
+export const getAdminUsers = (params = {}) => api.get('/admin/users', { params });
+
+/** @param {{is_active?: boolean, role?: 'student'|'college_admin'}} data */
+export const updateAdminUser = (id, data) => api.patch(`/admin/users/${id}`, data);
+
+export const deleteAdminUser = (id) => api.delete(`/admin/users/${id}`);
+
+export const getAdminCollege = () => api.get('/admin/college');
+
+/** @param {{name?: string, logo_url?: string, email_domains?: string[], require_verified_handles?: boolean}} data */
+export const updateAdminCollege = (data) => api.patch('/admin/college', data);
+
 // ==================== LEADERBOARD APIs ====================
 
 /**
