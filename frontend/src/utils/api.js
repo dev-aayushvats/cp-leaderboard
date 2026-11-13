@@ -4,11 +4,15 @@ import useAuthStore from '@/store/useAuthStore';
 // Get base URL from environment variable
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
+// Which college (tenant) this deployment serves. Sent on every request.
+export const COLLEGE_SLUG = process.env.NEXT_PUBLIC_COLLEGE_SLUG || 'default';
+
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'X-College-Slug': COLLEGE_SLUG,
   },
 });
 
@@ -40,6 +44,16 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// ==================== COLLEGE APIs ====================
+
+/**
+ * Get public info about this deployment's college (name, logo, allowed email domains)
+ * @returns {Promise} Axios response: { slug, name, logo_url, email_domains }
+ */
+export const getCollege = () => {
+  return api.get('/college');
+};
 
 // ==================== AUTHENTICATION APIs ====================
 
@@ -99,7 +113,6 @@ export const getProfile = () => {
 /**
  * Update user profile
  * @param {Object} data - Profile data to update
- * @param {string} data.institute - Institute name (optional)
  * @param {string} data.country - Country (optional)
  * @param {string} data.state - State (optional)
  * @param {string} data.leetcodeHandle - LeetCode handle (optional)
@@ -116,14 +129,12 @@ export const updateProfile = (data) => {
  * Get leaderboard data
  * @param {string} platform - Platform name ('leetcode' or 'codeforces')
  * @param {Object} filters - Optional filters
- * @param {string} filters.institute - Filter by institute
  * @param {string} filters.country - Filter by country
  * @param {string} filters.state - Filter by state
  * @returns {Promise} Axios response with leaderboard array
  */
 export const getLeaderboard = (platform, filters = {}) => {
   const params = new URLSearchParams();
-  if (filters.institute) params.append('institute', filters.institute);
   if (filters.country) params.append('country', filters.country);
   if (filters.state) params.append('state', filters.state);
 

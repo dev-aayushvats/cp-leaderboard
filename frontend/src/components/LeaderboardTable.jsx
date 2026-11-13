@@ -3,15 +3,16 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Filter } from "lucide-react";
 import { getLeaderboard } from "@/utils/api";
+import useCollege from "@/utils/useCollege";
 
 // --- SUB-COMPONENT: Shimmer Header ---
 // Creates the "liquid light" effect over the text
-const ShimmerHeader = () => {
+const ShimmerHeader = ({ title }) => {
   return (
     <div className="relative inline-block">
       {/* Background Text (Static) */}
       <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white/20">
-        Global Rankings
+        {title}
       </h1>
       {/* Overlay Text (Animated Gradient) */}
       <motion.h1
@@ -26,7 +27,7 @@ const ShimmerHeader = () => {
         }}
         style={{ backgroundSize: "200% auto" }}
       >
-        Global Rankings
+        {title}
       </motion.h1>
     </div>
   );
@@ -34,12 +35,12 @@ const ShimmerHeader = () => {
 
 // --- MAIN COMPONENT ---
 export default function LeaderboardTable() {
+  const college = useCollege();
   const [platform, setPlatform] = useState("leetcode"); // 'leetcode' or 'codeforces'
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [filters, setFilters] = useState({
-    institute: "",
     country: "",
     state: ""
   });
@@ -74,7 +75,7 @@ export default function LeaderboardTable() {
       {/* --- HEADER SECTION --- */}
       <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-6 border-b border-white/5 pb-8">
         <div>
-          <ShimmerHeader />
+          <ShimmerHeader title={college ? `${college.name} Rankings` : "Rankings"} />
           <p className="text-gray-500 mt-2 font-mono text-xs md:text-sm tracking-wider">
             /COMPETITIVE_PROGRAMMING /LEADERBOARD
           </p>
@@ -119,13 +120,7 @@ export default function LeaderboardTable() {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden mb-6"
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white/5 p-4 rounded-lg border border-white/10">
-               <input 
-                 name="institute" 
-                 placeholder="Filter by Institute..." 
-                 onChange={handleFilterChange}
-                 className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs text-white focus:border-pastel-blue outline-none"
-               />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white/5 p-4 rounded-lg border border-white/10">
                <input 
                  name="country" 
                  placeholder="Filter by Country..." 
@@ -221,12 +216,6 @@ export default function LeaderboardTable() {
                             <span className="text-[10px] text-gray-500 font-mono tracking-wider uppercase">
                                 @{user.platform_handle}
                             </span>
-                            {/* Show Institute Badge if exists */}
-                            {user.institute && (
-                                <span className="text-[9px] text-pastel-blue/70 border border-pastel-blue/20 px-1 rounded">
-                                    {user.institute}
-                                </span>
-                            )}
                         </div>
                       </div>
                     </div>

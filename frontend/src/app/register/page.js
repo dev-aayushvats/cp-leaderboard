@@ -5,10 +5,13 @@ import { User, Mail, Code2, Terminal, ArrowRight, Loader2, KeyRound } from "luci
 import { useRouter } from "next/navigation";
 import useAuthStore from "@/store/useAuthStore";
 import { sendOTP, registerWithOTP } from "@/utils/api";
+import useCollege from "@/utils/useCollege";
 
 export default function Register() {
     const router = useRouter();
     const login = useAuthStore((state) => state.login);
+    const college = useCollege();
+    const domains = college?.email_domains ?? [];
     
     const [step, setStep] = useState(1); // 1 = Details, 2 = OTP
     const [loading, setLoading] = useState(false);
@@ -71,7 +74,7 @@ export default function Register() {
             {step === 1 ? "Initialize Profile" : "Verify Identity"}
           </h1>
           <p className="text-gray-500 text-xs uppercase tracking-widest">
-            {step === 1 ? "Join the Global Leaderboard" : `Sent code to ${formData.email}`}
+            {step === 1 ? `Join the ${college?.name ?? ""} Leaderboard`.replace("  ", " ") : `Sent code to ${formData.email}`}
           </p>
         </div>
 
@@ -93,7 +96,7 @@ export default function Register() {
                 </div>
                 <div className="relative group">
                   <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-500 group-focus-within:text-pastel-purple transition-colors" />
-                  <input type="email" name="email" placeholder="Email Address" required onChange={handleChange} className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-pastel-purple/50 outline-none transition-all text-sm" />
+                  <input type="email" name="email" placeholder={domains.length ? `Email (${domains.map((d) => "@" + d).join(" / ")})` : "Email Address"} required onChange={handleChange} className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-gray-200 focus:border-pastel-purple/50 outline-none transition-all text-sm" />
                 </div>
                 
                 {/* Platform Handles */}

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Building, MapPin, Globe, Save, ArrowLeft, Code2, Terminal, Loader2 } from "lucide-react";
+import { MapPin, Globe, Save, ArrowLeft, Code2, Terminal, Loader2 } from "lucide-react";
 import Link from "next/link";
 import useAuthStore from "@/store/useAuthStore";
 import { useRouter } from "next/navigation";
@@ -15,7 +15,6 @@ export default function Settings() {
   const [initialLoading, setInitialLoading] = useState(true); // For fetching initial data
   
   const [formData, setFormData] = useState({
-    institute: "",
     country: "",
     state: "",
     leetcodeHandle: "",
@@ -35,7 +34,6 @@ export default function Settings() {
         
         // Populate form with fetched data
         setFormData({
-            institute: res.data.institute || "",
             country: res.data.country || "",
             state: res.data.state || "",
             leetcodeHandle: res.data.leetcode_handle || "",
@@ -104,22 +102,6 @@ export default function Settings() {
                 Regional Info
              </h2>
              
-             {/* Institute */}
-             <div className="space-y-2">
-                <label className="text-[10px] text-pastel-blue uppercase font-bold ml-1">Institute</label>
-                <div className="relative group">
-                <Building className="absolute left-3 top-3 w-4 h-4 text-gray-500 group-focus-within:text-pastel-blue transition-colors" />
-                <input
-                    type="text"
-                    name="institute"
-                    value={formData.institute}
-                    onChange={handleChange}
-                    placeholder="e.g. IIT Dharwad"
-                    className="w-full bg-dark-bg/50 border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-gray-200 focus:border-pastel-blue/50 focus:outline-none transition-all text-sm"
-                />
-                </div>
-             </div>
-
              <div className="grid grid-cols-2 gap-4">
                 {/* Country */}
                 <div className="space-y-2">
