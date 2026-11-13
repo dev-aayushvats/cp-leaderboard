@@ -2,8 +2,6 @@ import { Space_Mono } from "next/font/google";
 import "./globals.css";
 import { getCollege } from "@/lib/college-server";
 import { themeCss } from "@/utils/branding";
-import { CollegeProvider } from "@/utils/useCollege";
-import { CollegeNotFound, ServiceUnavailable } from "@/components/CollegeFallback";
 
 // Configure the font
 const spaceMono = Space_Mono({
@@ -39,13 +37,7 @@ export default async function RootLayout({ children }) {
         {css ? <style dangerouslySetInnerHTML={{ __html: css }} /> : null}
       </head>
       <body className={`${spaceMono.variable} font-mono antialiased bg-dark-bg text-gray-200`}>
-        {result.status === "ok" ? (
-          <CollegeProvider college={result.college}>{children}</CollegeProvider>
-        ) : result.status === "unknown" ? (
-          <CollegeNotFound rootDomain={result.rootDomain} />
-        ) : (
-          <ServiceUnavailable />
-        )}
+        {children}
       </body>
     </html>
   );

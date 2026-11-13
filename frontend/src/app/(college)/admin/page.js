@@ -14,6 +14,7 @@ import useCollege from "@/utils/useCollege";
 import { DEFAULT_PLATFORMS } from "@/utils/platforms";
 import { DEFAULT_BRAND, HEX, colorProblem, hexToTriplet } from "@/utils/branding";
 import CollegeLogo from "@/components/CollegeLogo";
+import ImportMembers from "@/components/ImportMembers";
 import { timeAgo } from "@/utils/time";
 
 const PAGE_SIZE = 25;
@@ -353,6 +354,12 @@ export default function AdminPage() {
         <section className="space-y-3">
           <h2 className="text-xs font-bold text-white/50 uppercase tracking-widest">College settings</h2>
           <CollegeSettings onError={setError} onSaved={() => router.refresh()} />
+        </section>
+
+        {/* Import */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-bold text-white/50 uppercase tracking-widest">Import members</h2>
+          <ImportMembers platforms={platformList} onImported={() => { loadUsers(); loadStats(); }} />
         </section>
 
         {/* Members */}

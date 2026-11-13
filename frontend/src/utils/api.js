@@ -1,8 +1,10 @@
 import axios from 'axios';
 import useAuthStore from '@/store/useAuthStore';
 
-// Get base URL from environment variable
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+// Where the browser sends API calls. Unset (the default) means same-origin /api, which the app's
+// own server proxies to the backend (see app/api/[...path]/route.js): one build then works for
+// any deployment. Set NEXT_PUBLIC_API_BASE_URL (at build time) to call a separate API origin directly.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
 
 // Which college a request is for is normally decided by the hostname the browser is
 // on (mit.example.com -> MIT, or a college's own custom domain), so one build serves
@@ -153,6 +155,14 @@ export const getAdminUsers = (params = {}) => api.get('/admin/users', { params }
 export const updateAdminUser = (id, data) => api.patch(`/admin/users/${id}`, data);
 
 export const deleteAdminUser = (id) => api.delete(`/admin/users/${id}`);
+
+/**
+ * Bulk-import members. With dry_run (the default) nothing is written: you get a per-row
+ * verdict to preview. Send dry_run: false to actually import the rows marked ok.
+ * @param {Object[]} rows - [{ line, email, name, batch, department, handles: {platformId: handle} }] (max 1000)
+ * @param {{dryRun?: boolean}} options
+ */
+export const importMembers = (rows, { dryRun = true } = {}) => api.post('/admin/users/import', { rows, dry_run: dryRun });
 
 export const getAdminCollege = () => api.get('/admin/college');
 
