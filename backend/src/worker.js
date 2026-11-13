@@ -1,76 +1,20 @@
 // src/worker.js
-const axios = require('axios');
 const pool = require('./config/db'); // Reuse your DB connection
 require('dotenv').config();
 
-// --- CONFIGURATION ---
-const LEETCODE_API_URL = 'https://leetcode.com/graphql';
-const CODEFORCES_API_URL = 'https://codeforces.com/api/user.info';
+const { fetchLeetCodeData, fetchCodeforcesData } = require('./services/platforms');
 
 // Helper: Sleep function to prevent Rate Limiting
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// --- LEETCODE: Fetch Rating + Solved ---
-async function fetchLeetCodeData(handle) {
-    const query = `
-    query userProfile($username: String!) {
-        userContestRanking(username: $username) {
-            rating
-        }
-        matchedUser(username: $username) {
-            submitStats {
-                acSubmissionNum {
-                    difficulty
-                    count
-                }
-            }
-        }
-    }
-    `;
-
-    try {
-        const response = await axios.post(LEETCODE_API_URL, {
-            query,
-            variables: { username: handle },
-        }, { headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' } });
-
-        if (response.data.errors) return null;
-
-        const rating = response.data.data.userContestRanking?.rating || 0;
-        // Index 0 is usually 'All' difficulties
-        const solved = response.data.data.matchedUser?.submitStats?.acSubmissionNum[0]?.count || 0;
-
-        return { rating, solved, maxRating: 0 }; // Return 0 for maxRating as we don't use it here
-    } catch (error) {
-        console.error(`Error LeetCode ${handle}:`, error.message);
-        return null;
-    }
-}
-
-// --- CODEFORCES: Fetch Rating + Max Rating ---
-async function fetchCodeforcesData(handle) {
-    try {
-        const response = await axios.get(`${CODEFORCES_API_URL}?handles=${handle}`);
-        if (response.data.status === 'OK') {
-            const user = response.data.result[0];
-            return { 
-                rating: user.rating || 0, 
-                maxRating: user.maxRating || 0, // This is free to fetch!
-                solved: 0 // We skip solved count for CF
-            };
-        }
-        return null;
-    } catch (error) {
-        console.error(`Error Codeforces ${handle}:`, error.message);
-        return null;
-    }
-}
 
 async function updateRatings() {
     console.log('🔄 Starting Update...');
 
     try {
-        const res = await pool.query("SELECT * FROM platform_stats");
+        // Suspended users are skipped to save platform API calls
+        const res = await pool.query(
+            "SELECT p.* FROM platform_stats p JOIN users u ON u.user_id = p.user_id WHERE u.is_active"
+        );
         const entries = res.rows;
         
         // Get today's date string (YYYY-MM-DD) to check for rollover
