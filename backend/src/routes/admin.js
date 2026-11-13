@@ -66,6 +66,18 @@ router.get('/admin/users', async (req, res) => {
             params.push(`%${String(req.query.search).replace(/[\\%_]/g, '\\$&')}%`);
             where += ` AND (u.username ILIKE $${params.length} OR u.email ILIKE $${params.length})`;
         }
+        // Filters. Unknown values are ignored rather than silently matching nothing.
+        const { role, status, department, problem } = req.query;
+        if (ROLES.includes(role)) { params.push(role); where += ` AND u.role = $${params.length}`; }
+        if (status === 'active') where += ' AND u.is_active';
+        if (status === 'suspended') where += ' AND NOT u.is_active';
+        if (/^\d{4}$/.test(String(req.query.batch || ''))) { params.push(parseInt(req.query.batch, 10)); where += ` AND u.batch = $${params.length}`; }
+        if (department) { params.push(String(department)); where += ` AND u.department = $${params.length}`; }
+        // Same definition as the "Sync issues" tile on /admin/stats: active members with a failing or not-found handle
+        if (problem === '1' || problem === 'true') {
+            where += ` AND u.is_active AND EXISTS (SELECT 1 FROM platform_stats q WHERE q.user_id = u.user_id
+                       AND (q.sync_failures >= 3 OR q.last_sync_error_kind = 'not_found'))`;
+        }
 
         const [list, count] = await Promise.all([
             pool.query(
