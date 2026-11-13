@@ -3,7 +3,8 @@ const pool = require('../config/db');
 const { signToken } = require('../middleware/auth');
 const { sendOtpLimiter, verifyOtpLimiter } = require('../middleware/rateLimit');
 const { issueOtp, verifyOtp, clearOtp } = require('../services/otp');
-const { normalizeEmail, emailAllowed, domainError, isValidHandle } = require('../lib/college');
+const { normalizeEmail, emailAllowed, domainError } = require('../lib/college');
+const { parseHandles, parseAcademic } = require('../lib/profile');
 const { newVerificationToken } = require('../lib/tokens');
 
 const router = express.Router();
@@ -35,7 +36,7 @@ router.post('/send-otp', sendOtpLimiter, async (req, res) => {
 });
 
 router.post('/register-with-otp', verifyOtpLimiter, async (req, res) => {
-    const { username, otp, leetcodeHandle, codeforcesHandle } = req.body;
+    const { username, otp } = req.body;
     const email = normalizeEmail(req.body.email);
 
     // Re-check the whitelist: OTPs are keyed by email only, so an OTP requested
@@ -46,12 +47,12 @@ router.post('/register-with-otp', verifyOtpLimiter, async (req, res) => {
     if (!username || !username.trim()) {
         return res.status(400).json({ error: 'Display name is required' });
     }
-    const handles = [['leetcode', leetcodeHandle], ['codeforces', codeforcesHandle]]
-        .map(([platform, h]) => [platform, (h || '').trim()])
-        .filter(([, h]) => h);
-    if (handles.some(([, h]) => !isValidHandle(h))) {
-        return res.status(400).json({ error: 'Handles may only contain letters, digits, "_", "-" and "."' });
-    }
+    const parsedHandles = parseHandles(req.body.handles);
+    if (parsedHandles.error) return res.status(400).json({ error: parsedHandles.error });
+    const academic = parseAcademic(req.college, req.body);
+    if (academic.error) return res.status(400).json({ error: academic.error });
+    const { handles } = parsedHandles;
+    const { batch = null, department = null } = academic.values;
     if (!(await verifyOtp(email, otp))) {
         return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
@@ -61,9 +62,9 @@ router.post('/register-with-otp', verifyOtpLimiter, async (req, res) => {
         await client.query('BEGIN');
 
         const { rows } = await client.query(
-            `INSERT INTO users (username, email, college_id) VALUES ($1, $2, $3)
+            `INSERT INTO users (username, email, college_id, batch, department) VALUES ($1, $2, $3, $4, $5)
              RETURNING user_id, username, email, college_id, role`,
-            [username.trim(), email, req.college.college_id]
+            [username.trim(), email, req.college.college_id, batch, department]
         );
         const user = rows[0];
 
@@ -136,7 +137,7 @@ router.post('/login-with-otp', verifyOtpLimiter, async (req, res) => {
         res.json({
             message: 'Login successful',
             token: signToken(user),
-            user: { username: user.username, email: user.email, role: user.role, country: user.country, state: user.state },
+            user: { username: user.username, email: user.email, role: user.role },
         });
     } catch (err) {
         console.error(err.message);

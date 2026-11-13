@@ -23,7 +23,7 @@ const targetUser = (req, res, next) => {
 router.get('/admin/stats', async (req, res) => {
     try {
         const collegeId = req.college.college_id;
-        const [members, platforms] = await Promise.all([
+        const [members, platformStats, sync] = await Promise.all([
             pool.query(
                 `SELECT COUNT(*)::int AS total,
                         COUNT(*) FILTER (WHERE is_active)::int AS active,
@@ -34,9 +34,18 @@ router.get('/admin/stats', async (req, res) => {
                         COUNT(*)::int AS linked,
                         COUNT(p.verified_at)::int AS verified
                  FROM platform_stats p JOIN users u ON u.user_id = p.user_id
-                 WHERE u.college_id = $1 GROUP BY p.platform_name`, [collegeId]),
+                 WHERE u.college_id = $1 GROUP BY p.platform_name ORDER BY p.platform_name`, [collegeId]),
+            // Sync health: handles that keep failing (3+ runs in a row) and the most recent success
+            pool.query(
+                `SELECT MAX(p.last_synced_at) AS last_synced_at,
+                        COUNT(*) FILTER (WHERE p.sync_failures >= 3)::int AS failing,
+                        COUNT(*) FILTER (WHERE p.last_sync_error_kind = 'not_found')::int AS not_found,
+                        -- a handle can be both; 'issues' counts each problem handle once
+                        COUNT(*) FILTER (WHERE p.sync_failures >= 3 OR p.last_sync_error_kind = 'not_found')::int AS issues
+                 FROM platform_stats p JOIN users u ON u.user_id = p.user_id
+                 WHERE u.college_id = $1 AND u.is_active`, [collegeId]),
         ]);
-        res.json({ members: members.rows[0], platforms: platforms.rows });
+        res.json({ members: members.rows[0], platforms: platformStats.rows, sync: sync.rows[0] });
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server Error' });
@@ -58,11 +67,14 @@ router.get('/admin/users', async (req, res) => {
 
         const [list, count] = await Promise.all([
             pool.query(
-                `SELECT u.user_id, u.username, u.email, u.role, u.is_active, u.created_at,
-                    MAX(p.platform_handle) FILTER (WHERE p.platform_name = 'leetcode')   AS leetcode_handle,
-                    BOOL_OR(p.verified_at IS NOT NULL) FILTER (WHERE p.platform_name = 'leetcode')   AS leetcode_verified,
-                    MAX(p.platform_handle) FILTER (WHERE p.platform_name = 'codeforces') AS codeforces_handle,
-                    BOOL_OR(p.verified_at IS NOT NULL) FILTER (WHERE p.platform_name = 'codeforces') AS codeforces_verified
+                `SELECT u.user_id, u.username, u.email, u.role, u.is_active, u.created_at, u.batch, u.department,
+                    COALESCE(jsonb_object_agg(p.platform_name, jsonb_build_object(
+                        'handle', p.platform_handle,
+                        'verified', p.verified_at IS NOT NULL,
+                        'sync_error', p.last_sync_error,
+                        'sync_error_kind', p.last_sync_error_kind,
+                        'sync_failures', p.sync_failures
+                    )) FILTER (WHERE p.id IS NOT NULL), '{}'::jsonb) AS handles
                  FROM users u LEFT JOIN platform_stats p ON p.user_id = u.user_id
                  WHERE ${where}
                  GROUP BY u.user_id
@@ -122,13 +134,14 @@ router.delete('/admin/users/:id', targetUser, async (req, res) => {
 const collegeSettings = (c) => ({
     slug: c.slug, name: c.name, logo_url: c.logo_url,
     email_domains: c.email_domains, require_verified_handles: c.require_verified_handles,
+    departments: c.departments,
 });
 
 router.get('/admin/college', (req, res) => res.json(collegeSettings(req.college)));
 
 router.patch('/admin/college', async (req, res) => {
     try {
-        const { name, logo_url, email_domains, require_verified_handles } = req.body;
+        const { name, logo_url, email_domains, require_verified_handles, departments } = req.body;
         const next = { ...req.college };
 
         if (name !== undefined) {
@@ -150,6 +163,13 @@ router.patch('/admin/college', async (req, res) => {
             if (bad) return res.status(400).json({ error: `"${bad}" is not a valid domain` });
             next.email_domains = domains;
         }
+        if (departments !== undefined) {
+            if (!Array.isArray(departments)) return res.status(400).json({ error: 'departments must be a list' });
+            const cleaned = [...new Set(departments.map((d) => String(d).trim()).filter(Boolean))];
+            if (cleaned.length > 50) return res.status(400).json({ error: 'At most 50 departments' });
+            if (cleaned.some((d) => d.length > 80)) return res.status(400).json({ error: 'Department names are limited to 80 characters' });
+            next.departments = cleaned;
+        }
         if (require_verified_handles !== undefined) {
             if (typeof require_verified_handles !== 'boolean') {
                 return res.status(400).json({ error: 'require_verified_handles must be a boolean' });
@@ -158,10 +178,10 @@ router.patch('/admin/college', async (req, res) => {
         }
 
         const { rows } = await pool.query(
-            `UPDATE colleges SET name = $2, logo_url = $3, email_domains = $4, require_verified_handles = $5
+            `UPDATE colleges SET name = $2, logo_url = $3, email_domains = $4, require_verified_handles = $5, departments = $6
              WHERE college_id = $1
-             RETURNING slug, name, logo_url, email_domains, require_verified_handles`,
-            [req.college.college_id, next.name, next.logo_url, next.email_domains, next.require_verified_handles]
+             RETURNING slug, name, logo_url, email_domains, require_verified_handles, departments`,
+            [req.college.college_id, next.name, next.logo_url, next.email_domains, next.require_verified_handles, next.departments]
         );
         res.json(rows[0]);
     } catch (err) {

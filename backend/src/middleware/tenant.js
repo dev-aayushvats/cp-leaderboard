@@ -8,7 +8,7 @@ const resolveCollege = async (req, res, next) => {
     if (!slug) return res.status(400).json({ error: 'College not specified' });
 
     const { rows } = await pool.query(
-        `SELECT college_id, slug, name, email_domains, logo_url, require_verified_handles
+        `SELECT college_id, slug, name, email_domains, logo_url, require_verified_handles, departments
          FROM colleges WHERE slug = $1 AND is_active`,
         [slug]
     );

@@ -33,10 +33,14 @@ npm install
 npm run dev                 # app on :3000
 ```
 
-**3. Sync ratings** (not scheduled yet: run manually or from an external cron)
+**3. Sync ratings.** Ratings are pulled by a separate worker process:
 ```bash
-cd backend && npm run worker
+cd backend
+npm run worker            # one sync of every handle, then exit (use from cron / a scheduler)
+npm run worker:schedule   # long-running: sync now, then on SYNC_CRON (default: hourly)
 ```
+Run `worker:schedule` as a second process next to the API (a process manager, a second
+container, ...). It shuts down cleanly on SIGTERM. See [The sync worker](#the-sync-worker).
 
 ## Colleges
 
@@ -50,6 +54,44 @@ npm run college:add -- <slug> "<Display Name>" [domain1,domain2]
 The frontend picks its college from `NEXT_PUBLIC_COLLEGE_SLUG` and sends it as the
 `X-College-Slug` header on every request. The backend falls back to
 `DEFAULT_COLLEGE_SLUG` if the header is absent.
+
+## Platforms
+
+LeetCode, Codeforces and AtCoder are supported. Each platform is one file in
+`backend/src/platforms/` (stats fetcher, profile-text fetcher for verification, handle
+format, delay between requests). To add one, create `<id>.js` exporting that shape and list
+it in `platforms/index.js`. The API, worker, verification, leaderboard tabs, settings and
+admin panel pick it up automatically; the only per-platform frontend code is its colors/icon
+in `frontend/src/utils/platforms.js`.
+
+AtCoder note: it has no official API for solved counts, so those come from the community
+service kenkoooo. If that's down, ratings still refresh and the previous solved count is kept.
+
+## The sync worker
+
+- **Lanes:** each platform is synced one handle at a time with a polite delay (configurable
+  per platform, e.g. `SYNC_DELAY_LEETCODE_MS`), and platforms run in parallel, so a run takes
+  as long as the slowest platform, not the sum. Stalest handles go first.
+- **Retries and failures:** transient failures are retried (3 attempts); a handle that doesn't
+  exist is not. Every handle records its last error and consecutive failures. Members see a
+  "couldn't find this account" note for a bad handle, and admins see sync issues in the admin
+  panel.
+- **History:** every successful sync writes that day's rating/solved to `rating_history` (one
+  row per handle per day), which feeds the profile graphs. Changing a handle clears its history.
+- **"Today":** the daily "+N solved today" counter and history dates roll over at midnight in
+  `APP_TIMEZONE` (an IANA name such as `Asia/Kolkata`; default UTC). Set this to your college's zone.
+- A run that starts while another is still going is skipped. `SYNC_CRON` sets the schedule.
+
+## Members, profiles and filters
+
+- Members can set a **batch** (graduation year) and a **department**. Departments are a list
+  the college admin maintains (admin panel -> College settings), so values stay clean.
+  Leave the list empty to turn departments off.
+- The leaderboard can be filtered by batch and department, and each row links to a public
+  **profile page** (`/u/<name>`) with rank in the college, rating, peak, solved count and a
+  daily rating/solved graph. Profiles never show email addresses and follow the same
+  visibility rules as the leaderboard (suspended members and, if enabled, unverified handles
+  are hidden).
 
 ## Admins
 
