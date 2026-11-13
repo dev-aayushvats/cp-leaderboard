@@ -14,9 +14,44 @@ backend/    Express + Postgres API (routes/, middleware/, services/), SQL migrat
 frontend/   Next.js app
 ```
 
-## Setup
+## Quick start with Docker (recommended)
 
-**1. Backend**
+You need Docker. Everything runs from one command: the database, the API, the rating-sync worker and the website.
+
+```bash
+cp .env.example .env        # fill in the few required values (see below)
+docker compose up -d --build
+```
+Open `http://localhost:3000`. The first start creates the database, applies migrations, and (single-college mode)
+creates your college and its admin from the settings in `.env`. Sign in with the admin email: a code arrives by email.
+
+**Minimum `.env`:**
+```
+POSTGRES_PASSWORD=pick-letters-and-digits
+JWT_SECRET=<openssl rand -hex 48>
+EMAIL_USER=you@gmail.com            # sends the login codes
+EMAIL_PASS=<gmail app password>
+COLLEGE_SLUG=mit                    # ---- one college ----
+COLLEGE_NAME=MIT
+COLLEGE_EMAIL_DOMAINS=mit.edu
+COLLEGE_ADMIN_EMAIL=you@mit.edu
+```
+For **many colleges** instead, leave `COLLEGE_SLUG` empty and set `ROOT_DOMAIN=yoursite.com` and
+`SUPERADMIN_EMAILS=you@yoursite.com`; then create colleges at `/platform` (see [Platform console](#platform-console)).
+
+- **Data** lives in the `pgdata` Docker volume: `docker compose down` keeps it, `docker compose down -v` deletes it.
+- **Updating:** `git pull && docker compose up -d --build`. Migrations run automatically on start.
+- **Logs:** `docker compose logs -f api worker`.
+- **The API isn't published**: only the website is (port `WEB_PORT`). The browser talks to the site's own `/api`,
+  which the site forwards to the API, so one build works on any address, with no CORS and no baked-in URLs.
+- **Production:** put an HTTPS reverse proxy (Caddy, nginx, Traefik, a cloud load balancer) in front of port 3000. It must
+  pass each visitor's address in `X-Forwarded-For` (they do by default) and forward the original `Host`. Without one,
+  every visitor looks like the same IP and shares the per-IP rate limits, so raise `RATE_LIMIT_*` in `.env` for plain-HTTP/LAN installs.
+- **Behind that proxy** keep `TRUST_PROXY=1` (the number of proxies in front).
+
+## Running from source (development)
+
+**1. Backend** (needs a Postgres database; `docker run -d -e POSTGRES_PASSWORD=pw -p 5432:5432 postgres:16` works)
 ```bash
 cd backend
 cp .env.example .env        # fill in DATABASE_URL, JWT_SECRET, EMAIL_USER/PASS
@@ -30,7 +65,7 @@ npm run dev                 # API on :5000 (set PORT if that's taken: macOS AirP
 **2. Frontend**
 ```bash
 cd frontend
-cp .env.example .env.local  # set NEXT_PUBLIC_API_BASE_URL to the API above
+cp .env.example .env.local  # set API_INTERNAL_URL if the API isn't on http://localhost:5000
 npm install
 npm run dev                 # app on :3000
 ```
@@ -73,20 +108,43 @@ A subdomain that doesn't exist (a typo) is "College not found", never someone el
 leaderboard. The bare root domain shows a small "find your college" page.
 Members' sessions are stored per address, so logging in at `mit.…` never carries over to `iit.…`.
 
-**Setting it up on a server:**
+**Setting it up on a server** (with Docker, `ROOT_DOMAIN` and `SUPERADMIN_EMAILS` in `.env` do steps 1 and 5's setup for you):
 1. Set `ROOT_DOMAIN=leaderboard.example.com` in the backend env. Leave `DEFAULT_COLLEGE_SLUG` unset.
 2. Point wildcard DNS `*.leaderboard.example.com` (and the bare name) at the frontend, and get a
    wildcard TLS certificate (e.g. Caddy or a DNS-challenge certificate). The frontend and API each
    need to be reachable by browsers; set `NEXT_PUBLIC_API_BASE_URL` at build time.
-3. Leave `NEXT_PUBLIC_COLLEGE_SLUG` unset in the frontend. If the frontend server reaches the API
-   at a different address than browsers do (e.g. a docker network), set `API_INTERNAL_URL`.
+3. Leave `NEXT_PUBLIC_COLLEGE_SLUG` unset in the frontend. The frontend forwards `/api` to the API at
+   `API_INTERNAL_URL` (set at runtime), so no build-time URL is needed.
 4. Behind a reverse proxy, set `TRUST_PROXY` (see Security notes) and forward the original `Host`
    (or `X-Forwarded-Host`) header to the frontend.
-5. Create colleges with `college:add`. They go live immediately at `<slug>.leaderboard.example.com`.
+5. Create colleges in the [Platform console](#platform-console) (or with `college:add`). They go live immediately at `<slug>.leaderboard.example.com`.
 
 **Custom domains** (e.g. `cp.mit.edu`): the college points a DNS `CNAME` at your frontend, you add the
 domain to your TLS setup, then run `college:add -- mit "MIT" mit.edu --custom-domain=cp.mit.edu`.
 Custom domains are operator-set on purpose: a college admin can't claim a domain by typing it.
+
+## Platform console
+
+Operators (you) create and manage colleges from the browser instead of the command line. Set
+`SUPERADMIN_EMAILS=you@example.com` (comma-separated for several) and open **`/platform`** (it works on any address,
+including the bare root domain). Sign in with an emailed code.
+
+From the console you can **create a college** (address, name, allowed email domains, optional custom domain and its
+first admin, all in one step), **edit** it, **add admins**, and **take a college offline** (its address then says
+"College not found" until you bring it back; nothing is deleted). Colleges can't be deleted from the UI on purpose.
+Operator sessions last 12 hours; removing an address from `SUPERADMIN_EMAILS` (and restarting) revokes it immediately.
+The command line (`college:add`, `admin:add`) does the same things and shares the same rules.
+
+## Importing members
+
+College admins can add a whole class at once: **Admin panel -> Import members**. Upload a CSV (or paste rows) with
+columns `email` (required), `name`, `batch`, `department` and one column per platform (`leetcode`, `codeforces`,
+`atcoder`). A bare list of emails also works, and a template can be downloaded in the panel.
+
+Every import is **previewed first**: each row is marked ready, already registered (skipped, so re-importing the same file
+is safe) or needs fixing, with the reason and the line number from your file. Nothing is saved until you confirm, and
+rows that need fixing are skipped. Imported members aren't emailed: they sign in with their address like anyone else and
+can verify their handles in Settings. The college's email-domain rule applies. Up to 1000 rows per import.
 
 ## Branding
 
@@ -179,6 +237,7 @@ Plain SQL files in `backend/migrations/`, applied in filename order by
 schema, add the next numbered file (e.g. `003_batches.sql`); never edit an
 applied one. Existing databases created before migrations existed upgrade
 safely: `001_baseline.sql` is idempotent and existing users are moved into a
-`default` college.
+`default` college. A fresh install has no colleges until you create one (a `default`
+college that has no members is removed by `006`).
 
 For a local Postgres without SSL, set `DATABASE_SSL=false`.

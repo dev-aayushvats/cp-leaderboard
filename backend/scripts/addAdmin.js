@@ -3,15 +3,20 @@
 // email-domain whitelist is NOT enforced here, so admins may use any address.
 // Usage: npm run admin:add -- <college-slug> <email> [display-name]
 const pool = require('../src/config/db');
+const { isEmail, ensureAdmin } = require('../src/lib/colleges');
 
 async function main() {
-    const [slug, rawEmail, name] = process.argv.slice(2);
-    if (!slug || !rawEmail) {
+    const [slug, email, name] = process.argv.slice(2);
+    if (!slug || !email) {
         console.error('Usage: npm run admin:add -- <college-slug> <email> [display-name]');
         process.exitCode = 1;
         return;
     }
-    const email = rawEmail.trim().toLowerCase();
+    if (!isEmail(email.trim())) {
+        console.error(`"${email}" is not a valid email address.`);
+        process.exitCode = 1;
+        return;
+    }
 
     const college = await pool.query('SELECT college_id, name FROM colleges WHERE slug = $1', [slug.toLowerCase()]);
     if (college.rows.length === 0) {
@@ -21,24 +26,15 @@ async function main() {
     }
     const { college_id, name: collegeName } = college.rows[0];
 
-    const existing = await pool.query('SELECT user_id, college_id FROM users WHERE LOWER(email) = $1', [email]);
-    if (existing.rows.length > 0) {
-        if (existing.rows[0].college_id !== college_id) {
-            console.error(`${email} already has an account in a different college.`);
-            process.exitCode = 1;
-            return;
-        }
-        await pool.query("UPDATE users SET role = 'college_admin', is_active = TRUE WHERE user_id = $1", [existing.rows[0].user_id]);
-        console.log(`✅ Promoted existing user ${email} to admin of ${collegeName}`);
-        return;
+    const result = await ensureAdmin(pool, college_id, email, name);
+    if (result.error) {
+        console.error(`${email} already has an account in a different college.`);
+        process.exitCode = 1;
+    } else if (result.action === 'promoted') {
+        console.log(`✅ Promoted existing user ${result.user.email} to admin of ${collegeName}`);
+    } else {
+        console.log(`✅ Created admin ${result.user.username} <${result.user.email}> for ${collegeName}. They can log in with an email code.`);
     }
-
-    const username = (name || email.split('@')[0]).slice(0, 50);
-    await pool.query(
-        "INSERT INTO users (username, email, college_id, role) VALUES ($1, $2, $3, 'college_admin')",
-        [username, email, college_id]
-    );
-    console.log(`✅ Created admin ${username} <${email}> for ${collegeName}. They can log in with an email code.`);
 }
 
 main()

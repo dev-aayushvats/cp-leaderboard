@@ -3,6 +3,7 @@ const pool = require('../config/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { normalizeDomains, isValidDomain } = require('../lib/college');
 const { parseBrandColor } = require('../lib/branding');
+const { MAX_ROWS, analyzeRows, commitRows, summarize, present } = require('../lib/importMembers');
 
 const router = express.Router();
 router.use('/admin', authenticate, requireAdmin);
@@ -84,6 +85,29 @@ router.get('/admin/users', async (req, res) => {
             pool.query(`SELECT COUNT(*)::int AS total FROM users u WHERE ${where}`, params),
         ]);
         res.json({ users: list.rows, total: count.rows[0].total });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Server Error' });
+    }
+});
+
+// Bulk import: pre-create members from a roster (CSV parsed client-side). They don't get an
+// email; they just sign in with their address like anyone else. dry_run defaults to TRUE so a
+// forgotten flag can never import by accident: the UI previews first, then sends dry_run:false.
+router.post('/admin/users/import', async (req, res) => {
+    try {
+        const { rows, dry_run } = req.body;
+        if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'No rows to import' });
+        if (rows.length > MAX_ROWS) return res.status(400).json({ error: `At most ${MAX_ROWS} rows per import. Split the file.` });
+
+        const analyzed = await analyzeRows(pool, req.college, rows);
+        let imported = 0;
+        if (dry_run === false) {
+            const client = await pool.connect();
+            try { imported = await commitRows(client, req.college, analyzed); }
+            finally { client.release(); }
+        }
+        res.json({ dry_run: dry_run !== false, summary: summarize(analyzed, imported), rows: analyzed.map(present) });
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server Error' });

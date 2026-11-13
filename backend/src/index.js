@@ -14,9 +14,15 @@ if (process.env.TRUST_PROXY) {
 }
 
 app.use(cors());
+// Bulk member import posts up to 1000 rows; everything else keeps the small default limit.
+// (Registered first: body-parser skips a request that has already been parsed.)
+app.use('/admin/users/import', express.json({ limit: '1mb' }));
 app.use(express.json());
 
 app.get('/', (req, res) => res.send('Leaderboard API is running'));
+
+// Platform console (operator-level): not tied to any college, so it comes before tenant resolution.
+app.use(require('./routes/platform'));
 
 // Everything below is tenant-scoped.
 app.use(resolveCollege);

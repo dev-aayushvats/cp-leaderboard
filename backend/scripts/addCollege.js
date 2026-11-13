@@ -5,11 +5,7 @@
 //   --custom-domain serve this college from its own domain too (point its DNS at the platform first)
 // Re-running with an existing slug updates its name and email domains (and custom domain, if given).
 const pool = require('../src/config/db');
-const { isValidDomain } = require('../src/lib/college');
-
-// Names that would collide with infrastructure or look official as a subdomain
-const RESERVED = new Set(['www', 'api', 'app', 'admin', 'root', 'mail', 'smtp', 'ftp', 'static', 'assets', 'cdn',
-    'docs', 'help', 'support', 'status', 'login', 'auth', 'dashboard', 'blog', 'localhost']);
+const { validateSlug, parseEmailDomains, parseCustomDomain, collegeUrl } = require('../src/lib/colleges');
 
 async function main() {
     const args = process.argv.slice(2);
@@ -27,35 +23,18 @@ async function main() {
         return;
     }
 
-    const slug = slugArg.toLowerCase();
-    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(slug)) {
-        console.error(`Invalid slug "${slugArg}": use lowercase letters, digits and hyphens (it becomes a subdomain, so no leading/trailing hyphen).`);
+    const slug = validateSlug(slugArg);
+    const domains = parseEmailDomains(domainsArg);
+    const custom = parseCustomDomain(flags['custom-domain']);
+    const problem = slug.error || domains.error || custom.error;
+    if (problem) {
+        console.error(problem);
         process.exitCode = 1;
         return;
     }
-    if (RESERVED.has(slug)) {
-        console.error(`"${slug}" is reserved. Pick another slug.`);
-        process.exitCode = 1;
-        return;
-    }
-
-    const emailDomains = domainsArg.split(',').map((d) => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean);
-    const bad = emailDomains.find((d) => !isValidDomain(d));
-    if (bad) {
-        console.error(`"${bad}" is not a valid email domain.`);
-        process.exitCode = 1;
-        return;
-    }
-
-    let customDomain = null;
-    if (flags['custom-domain'] !== undefined) {
-        customDomain = String(flags['custom-domain']).trim().toLowerCase();
-        if (!isValidDomain(customDomain)) {
-            console.error(`"${customDomain}" is not a valid domain.`);
-            process.exitCode = 1;
-            return;
-        }
-    }
+    // --custom-domain absent -> leave the existing one alone; present -> set it
+    const customDomain = flags['custom-domain'] !== undefined ? custom.value : null;
+    const emailDomains = domains.value;
 
     try {
         const { rows } = await pool.query(
@@ -63,12 +42,11 @@ async function main() {
              ON CONFLICT (slug) DO UPDATE
              SET name = $2, email_domains = $3, custom_domain = COALESCE($4, colleges.custom_domain)
              RETURNING slug, name, email_domains, custom_domain`,
-            [slug, name, emailDomains, customDomain]
+            [slug.value, name, emailDomains, customDomain]
         );
         const c = rows[0];
-        const root = process.env.ROOT_DOMAIN;
         console.log(`✅ ${c.name} (${c.slug})`);
-        console.log(`   URL: ${root ? `https://${c.slug}.${root}` : `http://${c.slug}.localhost:3000 (set ROOT_DOMAIN for a real domain)`}`);
+        console.log(`   URL: ${collegeUrl(c.slug)}${process.env.ROOT_DOMAIN ? '' : ' (set ROOT_DOMAIN for a real domain)'}`);
         if (c.custom_domain) console.log(`   Custom domain: ${c.custom_domain}`);
         console.log(c.email_domains.length
             ? `   Sign-up restricted to: ${c.email_domains.join(', ')}`

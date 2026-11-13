@@ -1,0 +1,81 @@
+# One command to run the whole platform:   docker compose up -d --build
+# Configure it in a .env file next to this one (copy .env.example). The same file runs either mode:
+#   single college:  set COLLEGE_SLUG (+ name, domains, admin)
+#   many colleges:   leave COLLEGE_SLUG empty; set ROOT_DOMAIN and SUPERADMIN_EMAILS
+name: cp-leaderboard
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./backend
+    image: cp-leaderboard-backend
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment: &api-env
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      DATABASE_SSL: "false"
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (e.g. openssl rand -hex 48)}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
+      SYNC_CRON: ${SYNC_CRON:-0 * * * *}
+      # which college(s) this serves
+      DEFAULT_COLLEGE_SLUG: ${COLLEGE_SLUG:-}
+      ROOT_DOMAIN: ${ROOT_DOMAIN:-}
+      SUPERADMIN_EMAILS: ${SUPERADMIN_EMAILS:-}
+      # first-run setup (only creates what doesn't exist yet)
+      BOOTSTRAP_COLLEGE_SLUG: ${COLLEGE_SLUG:-}
+      BOOTSTRAP_COLLEGE_NAME: ${COLLEGE_NAME:-}
+      BOOTSTRAP_EMAIL_DOMAINS: ${COLLEGE_EMAIL_DOMAINS:-}
+      BOOTSTRAP_ADMIN_EMAIL: ${COLLEGE_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_NAME: ${COLLEGE_ADMIN_NAME:-}
+      # the API sits behind the web container (and, in production, your HTTPS proxy)
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      # per-IP rate limits (see .env.example before raising or lowering)
+      RATE_LIMIT_CODES_PER_HOUR: ${RATE_LIMIT_CODES_PER_HOUR:-10}
+      RATE_LIMIT_VERIFY_PER_15_MIN: ${RATE_LIMIT_VERIFY_PER_15_MIN:-30}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/ >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  worker:
+    build: ./backend
+    image: cp-leaderboard-backend
+    restart: unless-stopped
+    command: ["node", "src/worker.js", "--schedule"]
+    depends_on:
+      api: { condition: service_healthy } # the API applies migrations first
+    environment:
+      <<: *api-env
+      MIGRATE_ON_START: "false"
+
+  web:
+    build: ./frontend
+    image: cp-leaderboard-frontend
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+    environment:
+      API_INTERNAL_URL: http://api:5000
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+
+volumes:
+  pgdata:
