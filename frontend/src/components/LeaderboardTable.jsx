@@ -62,7 +62,9 @@ export default function LeaderboardTable() {
   const batches = college?.batches ?? [];
   const departments = college?.departments ?? [];
 
-  const [platform, setPlatform] = useState("leetcode");
+  const [picked, setPicked] = useState("leetcode");
+  // The picked tab may have been switched off by the college admin: fall back to the first one that is on
+  const platform = platforms.some((p) => p.id === picked) ? picked : (platforms[0]?.id ?? picked);
   const [filters, setFilters] = useState({ batch: "", department: "" });
   const [showFilters, setShowFilters] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -144,7 +146,7 @@ export default function LeaderboardTable() {
             key={p.id}
             role="tab"
             aria-selected={platform === p.id}
-            onClick={() => setPlatform(p.id)}
+            onClick={() => setPicked(p.id)}
             className={`flex-1 md:flex-none whitespace-nowrap px-5 py-2 rounded-md text-sm font-bold font-mono transition-all duration-300 tracking-tight ${
               platform === p.id ? styleFor(p.id).tab : "text-gray-500 hover:text-gray-300"
             }`}

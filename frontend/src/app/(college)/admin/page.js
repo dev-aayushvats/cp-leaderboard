@@ -134,6 +134,7 @@ function CollegeSettings({ onError, onSaved }) {
   const [form, setForm] = useState(null);
   const [initial, setInitial] = useState(null);
   const [customDomain, setCustomDomain] = useState(null);
+  const [allPlatforms, setAllPlatforms] = useState([]); // every supported platform, from the server
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   // The uploaded logo is saved the moment it is chosen (it is not part of the "unsaved changes" form)
@@ -147,6 +148,7 @@ function CollegeSettings({ onError, onSaved }) {
       .then((res) => {
         setCustomDomain(res.data.custom_domain);
         setLogoVersion(res.data.logo_version);
+        setAllPlatforms(res.data.platforms.map(({ id, label }) => ({ id, label })));
         const loaded = {
           name: res.data.name,
           logo_url: res.data.logo_url || "",
@@ -156,6 +158,7 @@ function CollegeSettings({ onError, onSaved }) {
           domains: res.data.email_domains.join(", "),
           departments: res.data.departments.join(", "),
           require_verified_handles: res.data.require_verified_handles,
+          enabled_platforms: res.data.platforms.filter((p) => p.enabled).map((p) => p.id),
         };
         setForm(loaded);
         setInitial(loaded);
@@ -222,6 +225,7 @@ function CollegeSettings({ onError, onSaved }) {
         email_domains: form.domains.split(",").map((d) => d.trim()).filter(Boolean),
         departments: form.departments.split(",").map((d) => d.trim()).filter(Boolean),
         require_verified_handles: form.require_verified_handles,
+        enabled_platforms: form.enabled_platforms,
       });
       setInitial(form);
       setSaved(true);
@@ -335,6 +339,38 @@ function CollegeSettings({ onError, onSaved }) {
             Comma-separated. Members pick one in their settings and the leaderboard can be filtered by it. Leave empty to turn departments off.
           </p>
         </div>
+        <fieldset className="space-y-2">
+          <legend className="text-[10px] text-gray-400 uppercase font-bold">Platforms</legend>
+          <div className="flex flex-wrap gap-2">
+            {allPlatforms.map(({ id, label }) => {
+              const on = form.enabled_platforms.includes(id);
+              const onlyOne = on && form.enabled_platforms.length === 1; // keep at least one switched on
+              return (
+                <label
+                  key={id}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold select-none ${
+                    on ? "border-brand/40 bg-brand/10 text-white" : "border-white/10 text-gray-500"
+                  } ${onlyOne ? "cursor-not-allowed opacity-80" : "cursor-pointer"}`}
+                >
+                  <input
+                    type="checkbox"
+                    className="accent-emerald-300"
+                    checked={on}
+                    disabled={onlyOne}
+                    onChange={(e) => set({
+                      enabled_platforms: allPlatforms.map((p) => p.id).filter((pid) => (pid === id ? e.target.checked : form.enabled_platforms.includes(pid))),
+                    })}
+                  />
+                  {label}
+                </label>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-gray-500">
+            Switch off a platform your students don&apos;t use. It disappears from the leaderboard, sign-up, settings and profiles, and stops syncing.
+            Handles already linked are kept, so turning it back on restores everything. At least one must stay on.
+          </p>
+        </fieldset>
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
