@@ -1,4 +1,5 @@
 "use client";
+import { sharedSuffixProblem } from "@/utils/domains";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Plus, LogOut, ExternalLink, Pencil, UserPlus, Power, AlertTriangle, ShieldCheck, Mail, KeyRound, ArrowRight } from "lucide-react";
 import usePlatformStore from "@/store/usePlatformStore";
@@ -123,6 +124,7 @@ function NewCollege({ rootDomain, onCreated }) {
           <label className={label} htmlFor="nc-domains">Allowed sign-up email domains</label>
           <input id="nc-domains" className={input} value={f.domains} onChange={(e) => set({ domains: e.target.value })} placeholder="mit.edu, alum.mit.edu" />
           <p className="text-[10px] text-gray-500">{f.domains.trim() ? "Comma-separated. Subdomains are included." : "Empty means anyone can register."}</p>
+          {sharedSuffixProblem(f.domains) && <p className="text-[11px] text-orange-300" role="alert">{sharedSuffixProblem(f.domains)}</p>}
         </div>
         <div className="space-y-1">
           <label className={label} htmlFor="nc-custom">Custom domain (optional)</label>
@@ -228,7 +230,7 @@ function CollegeCard({ college, rootDomain, onChanged, onError }) {
       {mode === "edit" && (
         <form onSubmit={save} className="grid md:grid-cols-3 gap-3 pt-3 border-t border-white/5" aria-label={`Edit ${college.name}`}>
           <div className="space-y-1"><label className={label} htmlFor={id("name")}>Name</label><input id={id("name")} className={input} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div className="space-y-1"><label className={label} htmlFor={id("domains")}>Email domains</label><input id={id("domains")} className={input} value={form.domains} onChange={(e) => setForm({ ...form, domains: e.target.value })} placeholder="empty = open" /></div>
+          <div className="space-y-1"><label className={label} htmlFor={id("domains")}>Email domains</label><input id={id("domains")} className={input} value={form.domains} onChange={(e) => setForm({ ...form, domains: e.target.value })} placeholder="empty = open" />{sharedSuffixProblem(form.domains) && <p className="text-[11px] text-orange-300" role="alert">{sharedSuffixProblem(form.domains)}</p>}</div>
           <div className="space-y-1"><label className={label} htmlFor={id("custom")}>Custom domain</label><input id={id("custom")} className={`${input} font-mono`} value={form.custom} onChange={(e) => setForm({ ...form, custom: e.target.value })} placeholder="cp.college.edu" /></div>
           <div className="md:col-span-3 flex gap-3"><button disabled={busy} className="bg-white text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-200 disabled:opacity-60">Save</button><button type="button" onClick={() => setMode(null)} className="text-xs text-gray-400 hover:text-white">Cancel</button></div>
         </form>

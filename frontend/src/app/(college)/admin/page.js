@@ -13,6 +13,7 @@ import {
 import useCollege from "@/utils/useCollege";
 import { DEFAULT_PLATFORMS } from "@/utils/platforms";
 import { DEFAULT_BRAND, HEX, colorProblem, hexToTriplet } from "@/utils/branding";
+import { sharedSuffixProblem } from "@/utils/domains";
 import CollegeLogo from "@/components/CollegeLogo";
 import SiteHeader from "@/components/SiteHeader";
 import ImportMembers from "@/components/ImportMembers";
@@ -205,6 +206,7 @@ function CollegeSettings({ onError, onSaved }) {
     }
   };
   const colorsInvalid = !!(colorProblem(form.brand_primary, "Primary color") || colorProblem(form.brand_secondary, "Secondary color"));
+  const domainIssue = sharedSuffixProblem(form.domains);
 
   const save = async (e) => {
     e.preventDefault();
@@ -324,6 +326,7 @@ function CollegeSettings({ onError, onSaved }) {
           <p className="text-[10px] text-gray-500">
             Comma-separated. Subdomains are included. {form.domains.trim() ? "" : "Empty means anyone can register."}
           </p>
+          {domainIssue && <p className="text-[11px] text-orange-300" role="alert">{domainIssue}</p>}
         </div>
         <div className="space-y-1">
           <label className="text-[10px] text-gray-400 uppercase font-bold">Departments</label>
@@ -355,14 +358,14 @@ function CollegeSettings({ onError, onSaved }) {
         {dirty ? (
           <>
             <span className="text-xs text-gray-300">
-              {colorsInvalid ? "Fix the highlighted colors to save." : "You have unsaved changes."}
+              {colorsInvalid ? "Fix the highlighted colors to save." : domainIssue ? "Fix the email domains to save." : "You have unsaved changes."}
             </span>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => { setForm(initial); setSaved(false); }} disabled={saving}
                 className="text-xs font-bold px-3 py-2 rounded-lg border border-white/15 text-gray-300 hover:border-white/40 disabled:opacity-50">
                 Discard
               </button>
-              <button disabled={saving || colorsInvalid} className="bg-white text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2 disabled:opacity-50">
+              <button disabled={saving || colorsInvalid || !!domainIssue} className="bg-white text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2 disabled:opacity-50">
                 {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save settings
               </button>
             </div>
