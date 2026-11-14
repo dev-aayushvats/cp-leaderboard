@@ -1,7 +1,7 @@
 // Operator-level college management, shared by the CLI (scripts/), the platform
 // console API (routes/platform.js) and the container bootstrap, so all of them
 // apply exactly the same rules.
-const { normalizeDomains, isValidDomain } = require('./college');
+const { normalizeDomains, domainProblem, isPublicSuffix } = require('./college');
 
 const ROOT_DOMAIN = (process.env.ROOT_DOMAIN || '').trim().toLowerCase().replace(/^\./, '');
 
@@ -26,8 +26,11 @@ function validateSlug(raw) {
 function parseEmailDomains(input) {
     const list = Array.isArray(input) ? input : String(input || '').split(',');
     const domains = normalizeDomains(list);
-    const bad = domains.find((d) => !isValidDomain(d));
-    return bad ? { error: `"${bad}" is not a valid email domain.` } : { value: domains };
+    for (const d of domains) {
+        const problem = domainProblem(d);
+        if (problem) return { error: problem };
+    }
+    return { value: domains };
 }
 
 // null/'' clears it. A custom domain must not sit under the platform's own root
@@ -35,7 +38,9 @@ function parseEmailDomains(input) {
 function parseCustomDomain(raw) {
     if (raw === null || raw === undefined || raw === '') return { value: null };
     const domain = String(raw).trim().toLowerCase();
-    if (!isValidDomain(domain)) return { error: `"${raw}" is not a valid domain.` };
+    if (isPublicSuffix(domain)) return { error: `"${domain}" is a shared suffix, not a domain a college can own. Use the college's own address, such as cp.yourcollege.edu.` };
+    const problem = domainProblem(domain);
+    if (problem) return { error: problem };
     for (const root of [ROOT_DOMAIN, 'localhost'].filter(Boolean)) {
         if (domain === root || domain.endsWith('.' + root)) {
             return { error: `"${domain}" is under ${root}, which the platform uses for <slug>.${root}. Use the college's own domain.` };

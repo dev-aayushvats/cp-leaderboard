@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { normalizeDomains, isValidDomain } = require('../lib/college');
+const { normalizeDomains, domainProblem } = require('../lib/college');
 const { parseBrandColor } = require('../lib/branding');
 const { MAX_ROWS, analyzeRows, commitRows, summarize, present } = require('../lib/importMembers');
 const { MAX_LOGO_BYTES, sniffImage, logoVersion } = require('../lib/logo');
@@ -202,8 +202,10 @@ router.patch('/admin/college', async (req, res) => {
         if (email_domains !== undefined) {
             if (!Array.isArray(email_domains)) return res.status(400).json({ error: 'email_domains must be a list' });
             const domains = normalizeDomains(email_domains);
-            const bad = domains.find((d) => !isValidDomain(d));
-            if (bad) return res.status(400).json({ error: `"${bad}" is not a valid domain` });
+            for (const d of domains) {
+                const problem = domainProblem(d);
+                if (problem) return res.status(400).json({ error: problem });
+            }
             next.email_domains = domains;
         }
         if (departments !== undefined) {
