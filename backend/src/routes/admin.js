@@ -4,6 +4,7 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 const { normalizeDomains, domainProblem } = require('../lib/college');
 const { parseBrandColor } = require('../lib/branding');
 const { MAX_ROWS, analyzeRows, commitRows, summarize, present } = require('../lib/importMembers');
+const { describeAll, parseEnabled, disabledOf } = require('../lib/collegePlatforms');
 const { MAX_LOGO_BYTES, sniffImage, logoVersion } = require('../lib/logo');
 
 const router = express.Router();
@@ -37,7 +38,8 @@ router.get('/admin/stats', async (req, res) => {
                         COUNT(*)::int AS linked,
                         COUNT(p.verified_at)::int AS verified
                  FROM platform_stats p JOIN users u ON u.user_id = p.user_id
-                 WHERE u.college_id = $1 GROUP BY p.platform_name ORDER BY p.platform_name`, [collegeId]),
+                 WHERE u.college_id = $1 AND p.platform_name <> ALL($2::text[])
+                 GROUP BY p.platform_name ORDER BY p.platform_name`, [collegeId, disabledOf(req.college)]),
             // Sync health: handles that keep failing (3+ runs in a row) and the most recent success
             pool.query(
                 `SELECT MAX(p.last_synced_at) AS last_synced_at,
@@ -46,7 +48,7 @@ router.get('/admin/stats', async (req, res) => {
                         -- a handle can be both; 'issues' counts each problem handle once
                         COUNT(*) FILTER (WHERE p.sync_failures >= 3 OR p.last_sync_error_kind = 'not_found')::int AS issues
                  FROM platform_stats p JOIN users u ON u.user_id = p.user_id
-                 WHERE u.college_id = $1 AND u.is_active`, [collegeId]),
+                 WHERE u.college_id = $1 AND u.is_active AND p.platform_name <> ALL($2::text[])`, [collegeId, disabledOf(req.college)]),
         ]);
         res.json({ members: members.rows[0], platforms: platformStats.rows, sync: sync.rows[0] });
     } catch (err) {
@@ -76,7 +78,9 @@ router.get('/admin/users', async (req, res) => {
         if (department) { params.push(String(department)); where += ` AND u.department = $${params.length}`; }
         // Same definition as the "Sync issues" tile on /admin/stats: active members with a failing or not-found handle
         if (problem === '1' || problem === 'true') {
+            params.push(disabledOf(req.college));
             where += ` AND u.is_active AND EXISTS (SELECT 1 FROM platform_stats q WHERE q.user_id = u.user_id
+                       AND q.platform_name <> ALL($${params.length}::text[])
                        AND (q.sync_failures >= 3 OR q.last_sync_error_kind = 'not_found'))`;
         }
 
@@ -90,11 +94,11 @@ router.get('/admin/users', async (req, res) => {
                         'sync_error_kind', p.last_sync_error_kind,
                         'sync_failures', p.sync_failures
                     )) FILTER (WHERE p.id IS NOT NULL), '{}'::jsonb) AS handles
-                 FROM users u LEFT JOIN platform_stats p ON p.user_id = u.user_id
+                 FROM users u LEFT JOIN platform_stats p ON p.user_id = u.user_id AND p.platform_name <> ALL($${params.length + 1}::text[])
                  WHERE ${where}
                  GROUP BY u.user_id
                  ORDER BY u.created_at DESC
-                 LIMIT ${limit} OFFSET ${offset}`, params),
+                 LIMIT ${limit} OFFSET ${offset}`, [...params, disabledOf(req.college)]),
             pool.query(`SELECT COUNT(*)::int AS total FROM users u WHERE ${where}`, params),
         ]);
         res.json({ users: list.rows, total: count.rows[0].total });
@@ -178,13 +182,14 @@ const collegeSettings = (c) => ({
     departments: c.departments,
     brand_primary: c.brand_primary, brand_secondary: c.brand_secondary, tagline: c.tagline,
     custom_domain: c.custom_domain, // read-only here: set by the operator
+    platforms: describeAll(c),            // every supported platform, flagged on/off for this college
 });
 
 router.get('/admin/college', (req, res) => res.json(collegeSettings(req.college)));
 
 router.patch('/admin/college', async (req, res) => {
     try {
-        const { name, logo_url, email_domains, require_verified_handles, departments, brand_primary, brand_secondary, tagline } = req.body;
+        const { name, logo_url, email_domains, require_verified_handles, departments, brand_primary, brand_secondary, tagline, enabled_platforms } = req.body;
         const next = { ...req.college };
 
         if (name !== undefined) {
@@ -227,6 +232,11 @@ router.patch('/admin/college', async (req, res) => {
             if (t.length > 120) return res.status(400).json({ error: 'Tagline is limited to 120 characters' });
             next.tagline = t || null;
         }
+        if (enabled_platforms !== undefined) {
+            const parsed = parseEnabled(enabled_platforms);
+            if (parsed.error) return res.status(400).json({ error: parsed.error });
+            next.disabled_platforms = parsed.value;
+        }
         if (require_verified_handles !== undefined) {
             if (typeof require_verified_handles !== 'boolean') {
                 return res.status(400).json({ error: 'require_verified_handles must be a boolean' });
@@ -236,12 +246,12 @@ router.patch('/admin/college', async (req, res) => {
 
         const { rows } = await pool.query(
             `UPDATE colleges SET name = $2, logo_url = $3, email_domains = $4, require_verified_handles = $5, departments = $6,
-                    brand_primary = $7, brand_secondary = $8, tagline = $9
+                    brand_primary = $7, brand_secondary = $8, tagline = $9, disabled_platforms = $10
              WHERE college_id = $1
              RETURNING slug, name, logo_url, logo_version, email_domains, require_verified_handles, departments,
-                       brand_primary, brand_secondary, tagline, custom_domain`,
+                       brand_primary, brand_secondary, tagline, custom_domain, disabled_platforms`,
             [req.college.college_id, next.name, next.logo_url, next.email_domains, next.require_verified_handles, next.departments,
-             next.brand_primary, next.brand_secondary, next.tagline]
+             next.brand_primary, next.brand_secondary, next.tagline, next.disabled_platforms || []]
         );
         res.json(collegeSettings(rows[0]));
     } catch (err) {
@@ -277,7 +287,7 @@ router.put('/admin/college/logo', rawImage, async (req, res) => {
         const { rows } = await client.query(
             `UPDATE colleges SET logo_version = $2 WHERE college_id = $1
              RETURNING slug, name, logo_url, logo_version, email_domains, require_verified_handles, departments,
-                       brand_primary, brand_secondary, tagline, custom_domain`,
+                       brand_primary, brand_secondary, tagline, custom_domain, disabled_platforms`,
             [req.college.college_id, version]
         );
         await client.query('COMMIT');
@@ -306,7 +316,7 @@ router.delete('/admin/college/logo', async (req, res) => {
         const { rows } = await client.query(
             `UPDATE colleges SET logo_version = NULL WHERE college_id = $1
              RETURNING slug, name, logo_url, logo_version, email_domains, require_verified_handles, departments,
-                       brand_primary, brand_secondary, tagline, custom_domain`,
+                       brand_primary, brand_secondary, tagline, custom_domain, disabled_platforms`,
             [req.college.college_id]
         );
         await client.query('COMMIT');

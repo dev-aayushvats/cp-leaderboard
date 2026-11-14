@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const pool = require('./config/db');
-const platforms = require('./platforms');
+const { enabledPlatforms } = require('./lib/collegePlatforms');
 const { effectiveLogoUrl } = require('./lib/logo');
 const { resolveCollege } = require('./middleware/tenant');
 
@@ -42,7 +42,7 @@ app.get('/college', async (req, res) => {
         slug, name, logo_url, email_domains, require_verified_handles, departments,
         brand_primary, brand_secondary, tagline,
         batches: batches.rows.map((r) => r.batch),
-        platforms: platforms.describe(),
+        platforms: enabledPlatforms(req.college).map((p) => ({ id: p.id, label: p.label })),
     });
 });
 

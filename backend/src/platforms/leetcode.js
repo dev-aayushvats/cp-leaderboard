@@ -13,10 +13,17 @@ async function gql(query, variables) {
     }
 }
 
+// Highest rating after any contest the user actually took part in (history includes skipped weeks).
+function maxContestRating(history, current) {
+    const ratings = (history || []).filter((h) => h.attended).map((h) => h.rating);
+    return Math.round(Math.max(0, current?.rating || 0, ...ratings));
+}
+
 async function fetchStats(handle) {
     const data = await gql(
         `query ($u: String!) {
             userContestRanking(username: $u) { rating }
+            userContestRankingHistory(username: $u) { attended rating }
             matchedUser(username: $u) { submitStats { acSubmissionNum { difficulty count } } }
         }`,
         { u: handle }
@@ -29,7 +36,7 @@ async function fetchStats(handle) {
     const all = counts.find((c) => c.difficulty === 'All') || counts[0];
     return {
         rating: Math.round(d.userContestRanking?.rating || 0),
-        maxRating: 0, // not collected for LeetCode
+        maxRating: maxContestRating(d.userContestRankingHistory, d.userContestRanking),
         solved: all?.count ?? 0,
     };
 }

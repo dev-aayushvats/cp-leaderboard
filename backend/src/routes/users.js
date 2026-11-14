@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const platforms = require('../platforms');
+const { isEnabled } = require('../lib/collegePlatforms');
 
 const router = express.Router();
 
@@ -59,7 +60,7 @@ router.get('/users/:username', async (req, res) => {
             member_since: u.created_at,
             // Registry order (not alphabetical), so the primary platforms come first
             platforms: stats.rows
-                .filter((r) => platforms.get(r.platform_name))
+                .filter((r) => platforms.get(r.platform_name) && isEnabled(req.college, r.platform_name))
                 .sort((a, b) => platforms.ids.indexOf(a.platform_name) - platforms.ids.indexOf(b.platform_name))
                 .map((r) => {
                     const platform = platforms.get(r.platform_name);

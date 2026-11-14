@@ -1,15 +1,16 @@
 // Parsing/validation for the user-editable parts of a profile, shared by
 // registration and profile updates.
-const platforms = require('../platforms');
+const { enabledPlatforms } = require('./collegePlatforms');
 
 const BATCH_MIN = 1990;
 const BATCH_MAX = 2100;
 
-// input: { leetcode: 'x', codeforces: '', ... } (unknown keys ignored)
+// college: whose enabled platforms apply. input: { leetcode: 'x', codeforces: '', ... } (unknown keys ignored)
 // -> { handles: [[platformId, handle], ...] }  (blank entries dropped)  or  { error }
-function parseHandles(input) {
+function parseHandles(college, input) {
     const handles = [];
-    for (const platform of platforms.list) {
+    // Platforms the college has switched off are ignored, not errors (an old client may still send them)
+    for (const platform of enabledPlatforms(college)) {
         const raw = input?.[platform.id];
         const handle = typeof raw === 'string' ? raw.trim() : '';
         if (!handle) continue;

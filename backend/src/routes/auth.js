@@ -47,7 +47,7 @@ router.post('/register-with-otp', verifyOtpLimiter, async (req, res) => {
     if (!username || !username.trim()) {
         return res.status(400).json({ error: 'Display name is required' });
     }
-    const parsedHandles = parseHandles(req.body.handles);
+    const parsedHandles = parseHandles(req.college, req.body.handles);
     if (parsedHandles.error) return res.status(400).json({ error: parsedHandles.error });
     const academic = parseAcademic(req.college, req.body);
     if (academic.error) return res.status(400).json({ error: academic.error });

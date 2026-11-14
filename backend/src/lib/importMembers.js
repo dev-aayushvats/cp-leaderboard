@@ -32,7 +32,7 @@ async function analyzeRows(db, college, rows) {
         r.batch = academic.values.batch ?? null;
         r.department = academic.values.department ?? null;
 
-        const handles = parseHandles(raw.handles);
+        const handles = parseHandles(college, raw.handles);
         if (handles.error) { fail(handles.error); return r; }
         r.handles = handles.handles;
         return r;

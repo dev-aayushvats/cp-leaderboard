@@ -101,12 +101,14 @@ async function runSync() {
     const tally = { ok: 0, notFound: 0, failed: 0, skipped: 0 };
     try {
         console.log('🔄 Sync started');
-        // Suspended users are skipped to save platform API calls. Stalest first, so a
+        // Suspended users and switched-off platforms are skipped to save platform API calls. Stalest first, so a
         // run that gets cut short still refreshes whoever has waited longest.
         const { rows } = await pool.query(
             `SELECT p.id, p.platform_name, p.platform_handle
              FROM platform_stats p JOIN users u ON u.user_id = p.user_id
-             WHERE u.is_active
+                  JOIN colleges c ON c.college_id = u.college_id
+             WHERE u.is_active AND c.is_active
+               AND p.platform_name <> ALL(c.disabled_platforms)   -- a platform the college switched off isn't synced
              ORDER BY p.last_synced_at NULLS FIRST, p.id`
         );
 

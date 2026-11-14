@@ -19,9 +19,30 @@ async function getUser(handle) {
     }
 }
 
+// Distinct problems with an accepted submission (the same problem solved twice counts once; gym
+// contests, ids >= 100000, aren't counted). user.status returns every submission, so this is the
+// heavier call: a few KB for a student, a few MB for a grandmaster.
+async function fetchSolved(handle) {
+    const { data } = await axios.get(`https://codeforces.com/api/user.status?handle=${encodeURIComponent(handle)}`, { timeout: 30000 });
+    if (data.status !== 'OK' || !Array.isArray(data.result)) throw new Error(data.comment || 'unexpected response');
+    const solved = new Set();
+    for (const s of data.result) {
+        const p = s.problem;
+        if (s.verdict === 'OK' && p?.contestId < 100000) solved.add(`${p.contestId}/${p.index}`);
+    }
+    return solved.size;
+}
+
 async function fetchStats(handle) {
     const user = await getUser(handle);
-    return { rating: user.rating || 0, maxRating: user.maxRating || 0, solved: null }; // solved count isn't collected
+    let solved = null;
+    try {
+        solved = await fetchSolved(handle);
+    } catch {
+        // The rating is fresh, only the solved count failed: leave the previous count untouched (null)
+        // rather than failing the whole sync.
+    }
+    return { rating: user.rating || 0, maxRating: user.maxRating || 0, solved };
 }
 
 async function fetchProfileText(handle) {
@@ -37,7 +58,7 @@ async function fetchProfileText(handle) {
 module.exports = {
     id: 'codeforces',
     label: 'Codeforces',
-    delayMs: 1000,
+    delayMs: 2000, // Codeforces allows about one request per 2s, and each handle now needs two
     handlePattern: /^[A-Za-z0-9_.-]{1,40}$/,
     verificationHint: 'the "First name", "Last name", "Organization" or "City" field of your Codeforces profile',
     profileUrl: (h) => `https://codeforces.com/profile/${encodeURIComponent(h)}`,

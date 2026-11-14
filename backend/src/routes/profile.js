@@ -3,6 +3,7 @@ const pool = require('../config/db');
 const { authenticate } = require('../middleware/auth');
 const { verifyHandleLimiter } = require('../middleware/rateLimit');
 const platforms = require('../platforms');
+const { isEnabled, enabledPlatforms } = require('../lib/collegePlatforms');
 const { parseHandles, parseAcademic } = require('../lib/profile');
 const { newVerificationToken } = require('../lib/tokens');
 
@@ -21,10 +22,10 @@ router.get('/profile', async (req, res) => {
             ),
         ]);
 
-        const handles = Object.fromEntries(platforms.ids.map((id) => [id, null]));
+        const handles = Object.fromEntries(enabledPlatforms(req.college).map((p) => [p.id, null]));
         for (const row of stats.rows) {
             const platform = platforms.get(row.platform_name);
-            if (!platform) continue;
+            if (!platform || !isEnabled(req.college, platform.id)) continue;
             const verified = !!row.verified_at;
             handles[row.platform_name] = {
                 handle: row.platform_handle,
@@ -68,7 +69,7 @@ async function setHandle(userId, platform, handle) {
 
 router.put('/profile', async (req, res) => {
     try {
-        const parsedHandles = parseHandles(req.body.handles);
+        const parsedHandles = parseHandles(req.college, req.body.handles);
         if (parsedHandles.error) return res.status(400).json({ error: parsedHandles.error });
         const academic = parseAcademic(req.college, req.body);
         if (academic.error) return res.status(400).json({ error: academic.error });
@@ -95,7 +96,7 @@ router.put('/profile', async (req, res) => {
 // in a free-text field of their public platform profile.
 router.post('/profile/verify/:platform', verifyHandleLimiter, async (req, res) => {
     const platform = platforms.get(req.params.platform);
-    if (!platform) return res.status(400).json({ error: 'Unknown platform' });
+    if (!platform || !isEnabled(req.college, platform.id)) return res.status(400).json({ error: 'Unknown platform' });
 
     try {
         const { rows } = await pool.query(

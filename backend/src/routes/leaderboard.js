@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const platforms = require('../platforms');
+const { isEnabled, enabledPlatforms } = require('../lib/collegePlatforms');
 
 const router = express.Router();
 
@@ -12,8 +13,8 @@ const router = express.Router();
 router.get('/leaderboard/:platform', async (req, res) => {
     try {
         const platform = platforms.get(req.params.platform);
-        if (!platform) {
-            return res.status(400).json({ error: `Platform must be one of: ${platforms.ids.join(', ')}` });
+        if (!platform || !isEnabled(req.college, platform.id)) {
+            return res.status(400).json({ error: `Platform must be one of: ${enabledPlatforms(req.college).map((p) => p.id).join(', ')}` });
         }
         const { batch, department } = req.query;
 
