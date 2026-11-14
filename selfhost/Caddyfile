@@ -1,0 +1,6 @@
+# Used only when DOMAIN is set. Caddy gets and renews the HTTPS certificate by itself, and passes each
+# visitor's real address to the app (X-Forwarded-For), which the login rate limits rely on.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy web:3000
+}

@@ -49,6 +49,13 @@ For **many colleges** instead, leave `COLLEGE_SLUG` empty and set `ROOT_DOMAIN=y
   every visitor looks like the same IP and shares the per-IP rate limits, so raise `RATE_LIMIT_*` in `.env` for plain-HTTP/LAN installs.
 - **Behind that proxy** keep `TRUST_PROXY=1` (the number of proxies in front).
 
+## Self-hosting package for a single college
+
+Want to hand a college something it can run on its own server? `scripts/package-selfhost.sh` generates a clean,
+single-college copy (default: `../cp-leaderboard-selfhost`) from this repository: the same backend and frontend, plus a
+compose file, a `./setup.sh` that writes the `.env`, optional automatic HTTPS (Caddy), a backup script and a README for
+the college's admin. It is generated, not forked: re-run the script after changing the app. Templates live in `selfhost/`.
+
 ## Running from source (development)
 
 **1. Backend** (needs a Postgres database; `docker run -d -e POSTGRES_PASSWORD=pw -p 5432:5432 postgres:16` works)

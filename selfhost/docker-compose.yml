@@ -1,0 +1,101 @@
+# College Leaderboard (self-hosted). Start everything with:   docker compose up -d --build
+# Configure it in the .env file next to this one. Run ./setup.sh to create it.
+name: college-leaderboard
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run ./setup.sh (or copy .env.example to .env and fill it in)}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./backend
+    image: college-leaderboard-backend
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment: &api-env
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      DATABASE_SSL: "false"
+      JWT_SECRET: ${JWT_SECRET:?run ./setup.sh (or set JWT_SECRET in .env)}
+      # Outgoing mail (login codes). SMTP_HOST selects any SMTP server; otherwise Gmail is used.
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
+      SYNC_CRON: ${SYNC_CRON:-0 * * * *}
+      # One college. It is created on first start and never overwritten afterwards.
+      DEFAULT_COLLEGE_SLUG: ${COLLEGE_SLUG:-college}
+      BOOTSTRAP_COLLEGE_SLUG: ${COLLEGE_SLUG:-college}
+      BOOTSTRAP_COLLEGE_NAME: ${COLLEGE_NAME:?run ./setup.sh (or set COLLEGE_NAME in .env)}
+      BOOTSTRAP_EMAIL_DOMAINS: ${COLLEGE_EMAIL_DOMAINS:-}
+      BOOTSTRAP_ADMIN_EMAIL: ${COLLEGE_ADMIN_EMAIL:?run ./setup.sh (or set COLLEGE_ADMIN_EMAIL in .env)}
+      BOOTSTRAP_ADMIN_NAME: ${COLLEGE_ADMIN_NAME:-}
+      # Requests arrive through the web container (and Caddy, if enabled)
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      RATE_LIMIT_CODES_PER_HOUR: ${RATE_LIMIT_CODES_PER_HOUR:-10}
+      RATE_LIMIT_VERIFY_PER_15_MIN: ${RATE_LIMIT_VERIFY_PER_15_MIN:-30}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/ >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  worker:
+    build: ./backend
+    image: college-leaderboard-backend
+    restart: unless-stopped
+    command: ["node", "src/worker.js", "--schedule"]
+    depends_on:
+      api: { condition: service_healthy } # the API applies database migrations first
+    environment:
+      <<: *api-env
+      MIGRATE_ON_START: "false"
+
+  web:
+    build: ./frontend
+    image: college-leaderboard-frontend
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+    environment:
+      API_INTERNAL_URL: http://api:5000
+    ports:
+      # With a DOMAIN set, setup.sh binds this to 127.0.0.1 so only Caddy (HTTPS) is reachable from outside.
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-3000}:3000"
+
+  # HTTPS with an automatic Let's Encrypt certificate. Only runs when DOMAIN is set (COMPOSE_PROFILES=https).
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
