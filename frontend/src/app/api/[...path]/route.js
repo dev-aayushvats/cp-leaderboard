@@ -46,6 +46,11 @@ async function proxy(request, { params }) {
   if (type) out.set("content-type", type);
   const retry = upstream.headers.get("retry-after");
   if (retry) out.set("retry-after", retry);
+  // Caching and safety headers the API sets on the uploaded logo image
+  for (const name of ["cache-control", "content-security-policy", "x-content-type-options", "cross-origin-resource-policy"]) {
+    const value = upstream.headers.get(name);
+    if (value) out.set(name, value);
+  }
   return new Response(upstream.status === 204 ? null : await upstream.arrayBuffer(), { status: upstream.status, headers: out });
 }
 

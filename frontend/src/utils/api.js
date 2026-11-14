@@ -169,6 +169,13 @@ export const getAdminCollege = () => api.get('/admin/college');
 /** @param {{name?: string, logo_url?: string, email_domains?: string[], require_verified_handles?: boolean}} data */
 export const updateAdminCollege = (data) => api.patch('/admin/college', data);
 
+/** Upload a logo image (PNG, JPEG, GIF, WebP or SVG, up to 512 KB). @param {File} file */
+export const uploadCollegeLogo = (file) =>
+  api.put('/admin/college/logo', file, { headers: { 'Content-Type': file.type } });
+
+/** Remove the uploaded logo (a pasted logo URL, if any, is used again). */
+export const removeCollegeLogo = () => api.delete('/admin/college/logo');
+
 // ==================== LEADERBOARD APIs ====================
 
 /**

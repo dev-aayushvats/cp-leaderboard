@@ -1,13 +1,14 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
-  Loader2, ShieldCheck, Users, Search, Copy, Check, Download, Link2, X, Ban, RotateCcw, Trash2, BadgeCheck, Save, ChevronLeft, ChevronRight, AlertTriangle,
+  Loader2, ShieldCheck, Users, Search, Copy, Check, Download, Link2, X, Upload, Ban, RotateCcw, Trash2, BadgeCheck, Save, ChevronLeft, ChevronRight, AlertTriangle,
 } from "lucide-react";
 import useRequireAuth from "@/store/useRequireAuth";
 import {
   getProfile, getAdminStats, getAdminUsers, updateAdminUser, deleteAdminUser, getAdminCollege, updateAdminCollege,
+  uploadCollegeLogo, removeCollegeLogo,
 } from "@/utils/api";
 import useCollege from "@/utils/useCollege";
 import { DEFAULT_PLATFORMS } from "@/utils/platforms";
@@ -134,11 +135,17 @@ function CollegeSettings({ onError, onSaved }) {
   const [customDomain, setCustomDomain] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // The uploaded logo is saved the moment it is chosen (it is not part of the "unsaved changes" form)
+  const [logoVersion, setLogoVersion] = useState(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoNote, setLogoNote] = useState("");
+  const fileRef = useRef(null);
 
   useEffect(() => {
     getAdminCollege()
       .then((res) => {
         setCustomDomain(res.data.custom_domain);
+        setLogoVersion(res.data.logo_version);
         const loaded = {
           name: res.data.name,
           logo_url: res.data.logo_url || "",
@@ -159,6 +166,44 @@ function CollegeSettings({ onError, onSaved }) {
 
   const set = (patch) => { setForm({ ...form, ...patch }); setSaved(false); };
   const dirty = JSON.stringify(form) !== JSON.stringify(initial);
+
+  // What the site shows right now: the uploaded image if there is one, otherwise the pasted URL
+  const shownLogo = logoVersion ? `/api/college/logo?v=${logoVersion}` : form.logo_url;
+
+  const changeLogo = async (file) => {
+    if (!file) return;
+    setLogoNote("");
+    if (!/^image\/(png|jpeg|gif|webp|svg\+xml)$/.test(file.type)) { onError("Choose a PNG, JPEG, GIF, WebP or SVG image."); return; }
+    if (file.size > 512 * 1024) { onError(`That image is ${Math.round(file.size / 1024)} KB. The limit is 512 KB.`); return; }
+    setLogoBusy(true);
+    onError("");
+    try {
+      const res = await uploadCollegeLogo(file);
+      setLogoVersion(res.data.logo_version);
+      setLogoNote("Logo uploaded.");
+      onSaved?.();
+    } catch (err) {
+      onError(errMsg(err, "Failed to upload the logo"));
+    } finally {
+      setLogoBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+  const dropLogo = async () => {
+    setLogoBusy(true);
+    onError("");
+    setLogoNote("");
+    try {
+      const res = await removeCollegeLogo();
+      setLogoVersion(res.data.logo_version);
+      setLogoNote("Uploaded logo removed.");
+      onSaved?.();
+    } catch (err) {
+      onError(errMsg(err, "Failed to remove the logo"));
+    } finally {
+      setLogoBusy(false);
+    }
+  };
   const colorsInvalid = !!(colorProblem(form.brand_primary, "Primary color") || colorProblem(form.brand_secondary, "Secondary color"));
 
   const save = async (e) => {
@@ -202,13 +247,41 @@ function CollegeSettings({ onError, onSaved }) {
             <label className="text-[10px] text-gray-400 uppercase font-bold">College name</label>
             <input className={inputClass} value={form.name} onChange={(e) => set({ name: e.target.value })} required />
           </div>
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-400 uppercase font-bold">Logo URL (optional)</label>
+          <div className="space-y-2">
+            <label className="text-[10px] text-gray-400 uppercase font-bold">Logo / icon (optional)</label>
             <div className="flex items-center gap-3">
-              <CollegeLogo key={form.logo_url} college={{ name: form.name, logo_url: form.logo_url }} size={36} />
-              <input className={inputClass} value={form.logo_url} onChange={(e) => set({ logo_url: e.target.value })} placeholder="https://..." />
+              <CollegeLogo key={shownLogo} college={{ name: form.name, logo_url: shownLogo }} size={48} />
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                  className="sr-only"
+                  id="logo-file"
+                  onChange={(e) => changeLogo(e.target.files?.[0])}
+                />
+                <label
+                  htmlFor="logo-file"
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 text-xs font-bold text-gray-200 hover:border-white/40 cursor-pointer transition-colors focus-within:ring-1 focus-within:ring-white/40 ${logoBusy ? "opacity-50 pointer-events-none" : ""}`}
+                >
+                  {logoBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  {logoVersion ? "Replace image" : "Upload image"}
+                </label>
+                {logoVersion && (
+                  <button type="button" onClick={dropLogo} disabled={logoBusy} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-500/30 text-xs font-bold text-red-300 hover:border-red-500/60 disabled:opacity-50">
+                    <Trash2 className="w-3.5 h-3.5" /> Remove
+                  </button>
+                )}
+              </div>
             </div>
-            <p className="text-[10px] text-gray-500">A square image works best. Without one, your college&apos;s initials are shown.</p>
+            <p className="text-[10px] text-gray-500" role="status">
+              {logoNote || "PNG, JPEG, GIF, WebP or SVG, up to 512 KB. A square image works best. Without a logo, your college's initials are shown."}
+            </p>
+            <div className="space-y-1 pt-1">
+              <label htmlFor="logo-url" className="text-[10px] text-gray-500">Or use an image from a web address</label>
+              <input id="logo-url" className={inputClass} value={form.logo_url} onChange={(e) => set({ logo_url: e.target.value })} placeholder="https://..." />
+              {logoVersion && form.logo_url && <p className="text-[10px] text-orange-300">The uploaded image is shown. Remove it to use this address.</p>}
+            </div>
           </div>
         </div>
         <div className="space-y-1">
@@ -222,7 +295,7 @@ function CollegeSettings({ onError, onSaved }) {
         </div>
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div style={previewStyle} className="flex items-center gap-3 bg-dark-bg border border-white/10 rounded-lg px-4 py-3" aria-label="Preview">
-            <CollegeLogo key={form.logo_url} college={{ name: form.name, logo_url: form.logo_url }} size={32} />
+            <CollegeLogo key={shownLogo} college={{ name: form.name, logo_url: shownLogo }} size={32} />
             <div>
               <p className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand via-brand-2 to-brand leading-tight">{form.name || "Your college"} Rankings</p>
               <p className="text-[11px] text-gray-500">{form.tagline || "/COMPETITIVE_PROGRAMMING /LEADERBOARD"}</p>
