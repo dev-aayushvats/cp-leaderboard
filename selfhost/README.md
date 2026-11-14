@@ -97,3 +97,8 @@ docker compose restart api worker
 
 Four containers: `db` (PostgreSQL), `api`, `worker` (rating sync) and `web` (the website), plus `caddy` when
 `DOMAIN` is set. Only the website (and Caddy) is reachable from outside; the database and API are internal.
+
+## License
+
+GNU AGPL-3.0-or-later, see [LICENSE](LICENSE). You may use, modify and self-host it freely; if you run a modified
+version as a network service, you must make your modified source available to its users under the same license.

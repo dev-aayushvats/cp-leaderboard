@@ -250,3 +250,8 @@ safely: `001_baseline.sql` is idempotent and existing users are moved into a
 college that has no members is removed by `006`).
 
 For a local Postgres without SSL, set `DATABASE_SSL=false`.
+
+## License
+
+GNU AGPL-3.0-or-later, see [LICENSE](LICENSE). You may use, modify and self-host it freely; if you run a modified
+version as a network service, you must make your modified source available to its users under the same license.
