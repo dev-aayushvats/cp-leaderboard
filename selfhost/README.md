@@ -93,5 +93,7 @@ docker compose restart api worker
 - **Port already in use:** change `WEB_PORT` in `.env`, then `docker compose up -d`.
 
 ## What runs
+(For the full picture of how the pieces fit together, read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).)
+
 Four containers: `db` (PostgreSQL), `api`, `worker` (rating sync) and `web` (the website), plus `caddy` when
 `DOMAIN` is set. Only the website (and Caddy) is reachable from outside; the database and API are internal.

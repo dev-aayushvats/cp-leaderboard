@@ -30,6 +30,8 @@ rsync -a --delete $COMMON --exclude=README.md "$SRC/frontend/" "$DEST/frontend/"
 for f in docker-compose.yml Caddyfile setup.sh backup.sh README.md .env.example .gitignore; do
   cp "$SRC/selfhost/$f" "$DEST/$f"
 done
+mkdir -p "$DEST/docs"
+cp "$SRC/docs/ARCHITECTURE.md" "$DEST/docs/ARCHITECTURE.md"
 chmod +x "$DEST/setup.sh" "$DEST/backup.sh"
 
 COMMIT=$(git -C "$SRC" rev-parse --short HEAD 2>/dev/null || echo unknown)

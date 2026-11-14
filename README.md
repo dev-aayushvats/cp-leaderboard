@@ -14,6 +14,8 @@ backend/    Express + Postgres API (routes/, middleware/, services/), SQL migrat
 frontend/   Next.js app
 ```
 
+**Docs:** [Quick start](docs/QUICKSTART.md) · [Architecture, data flow and platform overview](docs/ARCHITECTURE.md)
+
 ## Quick start with Docker (recommended)
 
 You need Docker. Everything runs from one command: the database, the API, the rating-sync worker and the website.
