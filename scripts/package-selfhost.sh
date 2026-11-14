@@ -32,6 +32,7 @@ for f in docker-compose.yml Caddyfile setup.sh backup.sh README.md .env.example 
 done
 mkdir -p "$DEST/docs"
 cp "$SRC/docs/ARCHITECTURE.md" "$DEST/docs/ARCHITECTURE.md"
+cp "$SRC/LICENSE" "$DEST/LICENSE"
 chmod +x "$DEST/setup.sh" "$DEST/backup.sh"
 
 COMMIT=$(git -C "$SRC" rev-parse --short HEAD 2>/dev/null || echo unknown)
