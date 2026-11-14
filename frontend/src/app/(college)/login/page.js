@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import useAuthStore from "@/store/useAuthStore";
 import { sendLoginOTP, loginWithOTP } from "@/utils/api";
 import useCollege from "@/utils/useCollege";
+import SiteHeader from "@/components/SiteHeader";
 import CollegeLogo from "@/components/CollegeLogo";
 
 export default function Login() {
@@ -60,7 +61,9 @@ export default function Login() {
   };
 
   return (
-    <main className="min-h-screen bg-dark-bg flex items-center justify-center p-4 relative overflow-hidden font-mono">
+    <main className="min-h-screen bg-dark-bg relative overflow-x-clip flex flex-col font-mono">
+      <SiteHeader back hideAccount />
+      <div className="flex-1 flex items-center justify-center px-4 py-8 relative">
       {/* Background Ambience */}
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-brand/5 rounded-full blur-[128px] pointer-events-none" />
       
@@ -158,6 +161,7 @@ export default function Login() {
           </Link>
         </p>
       </motion.div>
+    </div>
     </main>
   );
 }

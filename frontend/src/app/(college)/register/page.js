@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import useAuthStore from "@/store/useAuthStore";
 import { sendOTP, registerWithOTP } from "@/utils/api";
 import useCollege from "@/utils/useCollege";
+import SiteHeader from "@/components/SiteHeader";
 import CollegeLogo from "@/components/CollegeLogo";
 import { styleFor, DEFAULT_PLATFORMS } from "@/utils/platforms";
 
@@ -72,7 +73,9 @@ export default function Register() {
     };
 
     return (
-        <main className="min-h-screen bg-dark-bg flex items-center justify-center p-4 relative overflow-hidden">
+        <main className="min-h-screen bg-dark-bg relative overflow-x-clip flex flex-col">
+      <SiteHeader back hideAccount />
+      <div className="flex-1 flex items-center justify-center px-4 py-8 relative">
             {/* Background Ambience */}
             <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-brand/5 rounded-full blur-[128px] pointer-events-none" />
             <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-brand-2/5 rounded-full blur-[128px] pointer-events-none" />
@@ -204,6 +207,7 @@ export default function Register() {
           </button>
         </form>
       </motion.div>
-        </main>
+        </div>
+    </main>
     );
 }

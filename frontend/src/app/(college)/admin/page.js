@@ -15,7 +15,7 @@ import { DEFAULT_PLATFORMS } from "@/utils/platforms";
 import { DEFAULT_BRAND, HEX, colorProblem, hexToTriplet } from "@/utils/branding";
 import { sharedSuffixProblem } from "@/utils/domains";
 import CollegeLogo from "@/components/CollegeLogo";
-import SiteHeader from "@/components/SiteHeader";
+import PageShell from "@/components/PageShell";
 import ImportMembers from "@/components/ImportMembers";
 import { timeAgo } from "@/utils/time";
 
@@ -493,7 +493,7 @@ export default function AdminPage() {
   };
 
   if (!authorized) {
-    return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-brand" /></div>;
+    return <main className="min-h-screen bg-dark-bg"><PageShell back hideAccount={false}><div className="flex justify-center py-24"><Loader2 className="animate-spin text-brand" /></div></PageShell></main>;
   }
 
   const verifiedTotal = stats ? stats.platforms.reduce((n, p) => n + p.verified, 0) : 0;
@@ -508,9 +508,8 @@ export default function AdminPage() {
   const btn = "px-2.5 py-1 rounded border text-[11px] font-bold transition-colors disabled:opacity-40 flex items-center gap-1";
 
   return (
-    <main className="min-h-screen bg-dark-bg text-gray-200 font-mono p-4 md:p-8 relative">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <SiteHeader back />
+    <main className="min-h-screen bg-dark-bg text-gray-200 font-mono relative overflow-x-clip">
+      <PageShell back className="space-y-8">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <ShieldCheck className="w-6 h-6 text-pastel-green" /> Admin Panel
         </h1>
@@ -733,7 +732,7 @@ export default function AdminPage() {
           )}
         </section>
         )}
-      </div>
+      </PageShell>
     </main>
   );
 }

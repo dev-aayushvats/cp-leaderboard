@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { GraduationCap, Building2, Save, Loader2, BadgeCheck, ShieldAlert, Copy, Check, ExternalLink, AlertTriangle } from "lucide-react";
-import SiteHeader from "@/components/SiteHeader";
+import PageShell from "@/components/PageShell";
 import useRequireAuth from "@/store/useRequireAuth";
 import { getProfile, updateProfile, verifyHandle } from "@/utils/api";
 import useCollege from "@/utils/useCollege";
@@ -188,19 +188,19 @@ export default function Settings() {
     ([id, v]) => saved[id]?.handle && v.trim().toLowerCase() !== saved[id].handle.toLowerCase()
   ).length;
 
-  if (initialLoading) return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-brand"/></div>;
+  if (initialLoading) return <main className="min-h-screen bg-dark-bg"><PageShell back hideAccount={false}><div className="flex justify-center py-24"><Loader2 className="animate-spin text-brand" /></div></PageShell></main>;
 
   return (
-    <main className="min-h-screen bg-dark-bg p-4 relative font-mono">
+    <main className="min-h-screen bg-dark-bg relative font-mono overflow-x-clip">
        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-brand/5 rounded-full blur-[128px]" />
       </div>
 
-      <SiteHeader back className="max-w-2xl mx-auto mb-6 pt-2" />
+      <PageShell back narrow="max-w-2xl">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-2xl mx-auto bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl relative z-10"
+        className="w-full bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl relative z-10"
       >
         <h1 className="text-2xl font-bold text-white mb-1">Profile Settings</h1>
         <p className="text-gray-500 text-xs mb-8">
@@ -290,6 +290,7 @@ export default function Settings() {
           </button>
         </form>
       </motion.div>
+      </PageShell>
     </main>
   );
 }

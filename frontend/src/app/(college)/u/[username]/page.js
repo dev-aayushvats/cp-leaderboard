@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { BadgeCheck, ExternalLink, Loader2, Pencil, Clock } from "lucide-react";
 import useAuthStore from "@/store/useAuthStore";
-import SiteHeader from "@/components/SiteHeader";
+import PageShell from "@/components/PageShell";
 import { getUserProfile } from "@/utils/api";
 import { styleFor } from "@/utils/platforms";
 import { timeAgo } from "@/utils/time";
@@ -54,20 +54,19 @@ export default function MemberProfile() {
   const me = useAuthStore((s) => s.user);
 
   if (state.status === "loading") {
-    return <div className="min-h-screen bg-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-brand" /></div>;
+    return <main className="min-h-screen bg-dark-bg"><PageShell back hideAccount={false}><div className="flex justify-center py-24"><Loader2 className="animate-spin text-brand" /></div></PageShell></main>;
   }
   if (state.status !== "ok") {
     return (
-      <main className="min-h-screen bg-dark-bg text-gray-200 font-mono p-8">
-        <div className="max-w-3xl mx-auto space-y-6">
-          <SiteHeader back />
+      <main className="min-h-screen bg-dark-bg text-gray-200 font-mono">
+        <PageShell back className="space-y-6">
           <div className="p-12 text-center border border-dashed border-white/10 rounded-lg">
             <p className="text-gray-300">{state.status === "missing" ? "Member not found." : "Couldn't load this profile."}</p>
             <p className="text-gray-500 text-xs mt-2">
               {state.status === "missing" ? "They may have left the college or changed their name." : "Please try again in a moment."}
             </p>
           </div>
-        </div>
+        </PageShell>
       </main>
     );
   }
@@ -84,15 +83,13 @@ export default function MemberProfile() {
   const ago = current && timeAgo(current.last_synced_at);
 
   return (
-    <main className="min-h-screen bg-dark-bg text-gray-200 font-mono relative overflow-x-hidden">
+    <main className="min-h-screen bg-dark-bg text-gray-200 font-mono relative overflow-x-clip">
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-brand/5 rounded-full blur-[128px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-brand-2/5 rounded-full blur-[128px]" />
       </div>
 
-      <div className="relative z-10 max-w-3xl mx-auto px-4 md:px-6 py-8 space-y-8">
-        <SiteHeader back />
-
+      <PageShell back className="space-y-8">
         {/* Header */}
         <header className="flex items-center gap-4">
           <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold text-black shadow-lg ${st ? st.avatar : "bg-gradient-to-br from-gray-300 to-gray-500"}`}>
@@ -209,7 +206,7 @@ export default function MemberProfile() {
             </section>
           </motion.div>
         )}
-      </div>
+      </PageShell>
     </main>
   );
 }

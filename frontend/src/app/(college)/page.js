@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import LeaderboardTable from "@/components/LeaderboardTable";
 import Link from "next/link";
 import useAuthStore from "@/store/useAuthStore"; // Import Zustand store
-import SiteHeader from "@/components/SiteHeader";
+import PageShell from "@/components/PageShell";
 
 export default function Home() {
   // Zustand Hooks
@@ -21,7 +21,7 @@ export default function Home() {
 
 
   return (
-    <main className="min-h-screen bg-dark-bg text-gray-200 relative overflow-x-hidden selection:bg-brand/20">
+    <main className="min-h-screen bg-dark-bg text-gray-200 relative overflow-x-clip selection:bg-brand/20">
 
       {/* Background Ambience (Fixed position so they don't scroll away) */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
@@ -29,12 +29,9 @@ export default function Home() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-pastel-red/5 rounded-full blur-[128px]" />
       </div>
 
-      <SiteHeader className="p-6" />
-
-      {/* Main Container - Top Aligned, Centered Horizontally */}
-      <div className="relative z-10 max-w-5xl mx-auto px-6 pt-10 md:pt-16 pb-20">
+      <PageShell>
         <LeaderboardTable />
-      </div>
+      </PageShell>
 
       {/* Floating Action Button */}
       {/* Only show if NOT logged in */}
