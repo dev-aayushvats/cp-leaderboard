@@ -4,6 +4,7 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 const { normalizeDomains, isValidDomain } = require('../lib/college');
 const { parseBrandColor } = require('../lib/branding');
 const { MAX_ROWS, analyzeRows, commitRows, summarize, present } = require('../lib/importMembers');
+const { MAX_LOGO_BYTES, sniffImage, logoVersion } = require('../lib/logo');
 
 const router = express.Router();
 router.use('/admin', authenticate, requireAdmin);
@@ -169,7 +170,10 @@ router.delete('/admin/users/:id', targetUser, async (req, res) => {
 
 // --- College settings ---
 const collegeSettings = (c) => ({
-    slug: c.slug, name: c.name, logo_url: c.logo_url,
+    slug: c.slug, name: c.name,
+    logo_url: c.logo_url,                 // the pasted URL, as saved
+    logo_uploaded: !!c.logo_version,      // an uploaded image takes precedence over the URL
+    logo_version: c.logo_version || null,
     email_domains: c.email_domains, require_verified_handles: c.require_verified_handles,
     departments: c.departments,
     brand_primary: c.brand_primary, brand_secondary: c.brand_secondary, tagline: c.tagline,
@@ -232,15 +236,85 @@ router.patch('/admin/college', async (req, res) => {
             `UPDATE colleges SET name = $2, logo_url = $3, email_domains = $4, require_verified_handles = $5, departments = $6,
                     brand_primary = $7, brand_secondary = $8, tagline = $9
              WHERE college_id = $1
-             RETURNING slug, name, logo_url, email_domains, require_verified_handles, departments,
+             RETURNING slug, name, logo_url, logo_version, email_domains, require_verified_handles, departments,
                        brand_primary, brand_secondary, tagline, custom_domain`,
             [req.college.college_id, next.name, next.logo_url, next.email_domains, next.require_verified_handles, next.departments,
              next.brand_primary, next.brand_secondary, next.tagline]
         );
-        res.json(rows[0]);
+        res.json(collegeSettings(rows[0]));
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server Error' });
+    }
+});
+
+// --- Logo upload ---
+// The browser sends the raw image as the request body. We check what the bytes really are (not the declared
+// type) and store them in the database. An uploaded logo wins over a pasted URL until it is removed.
+const rawImage = express.raw({
+    type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'],
+    limit: MAX_LOGO_BYTES,
+});
+router.put('/admin/college/logo', rawImage, async (req, res) => {
+    const buf = req.body;
+    if (!Buffer.isBuffer(buf) || buf.length === 0) {
+        return res.status(415).json({ error: 'Send a PNG, JPEG, GIF, WebP or SVG image.' });
+    }
+    const found = sniffImage(buf);
+    if (!found) return res.status(415).json({ error: 'That file is not a PNG, JPEG, GIF, WebP or SVG image.' });
+
+    const version = logoVersion(buf);
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query(
+            `INSERT INTO college_logos (college_id, content_type, data) VALUES ($1, $2, $3)
+             ON CONFLICT (college_id) DO UPDATE SET content_type = $2, data = $3, updated_at = NOW()`,
+            [req.college.college_id, found.type, buf]
+        );
+        const { rows } = await client.query(
+            `UPDATE colleges SET logo_version = $2 WHERE college_id = $1
+             RETURNING slug, name, logo_url, logo_version, email_domains, require_verified_handles, departments,
+                       brand_primary, brand_secondary, tagline, custom_domain`,
+            [req.college.college_id, version]
+        );
+        await client.query('COMMIT');
+        res.json(collegeSettings(rows[0]));
+    } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error(err.message);
+        res.status(500).json({ error: 'Server Error' });
+    } finally {
+        client.release();
+    }
+});
+// body-parser's "too large" and similar errors, as JSON like every other error here
+router.use('/admin/college/logo', (err, req, res, next) => {
+    if (err && err.type === 'entity.too.large') {
+        return res.status(413).json({ error: `The image is too large. The limit is ${Math.round(MAX_LOGO_BYTES / 1024)} KB.` });
+    }
+    next(err);
+});
+
+router.delete('/admin/college/logo', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM college_logos WHERE college_id = $1', [req.college.college_id]);
+        const { rows } = await client.query(
+            `UPDATE colleges SET logo_version = NULL WHERE college_id = $1
+             RETURNING slug, name, logo_url, logo_version, email_domains, require_verified_handles, departments,
+                       brand_primary, brand_secondary, tagline, custom_domain`,
+            [req.college.college_id]
+        );
+        await client.query('COMMIT');
+        res.json(collegeSettings(rows[0]));
+    } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error(err.message);
+        res.status(500).json({ error: 'Server Error' });
+    } finally {
+        client.release();
     }
 });
 

@@ -38,7 +38,7 @@ const resolveCollege = async (req, res, next) => {
 
     const { rows } = await pool.query(
         `SELECT college_id, slug, name, email_domains, logo_url, require_verified_handles, departments,
-                brand_primary, brand_secondary, tagline, custom_domain
+                brand_primary, brand_secondary, tagline, custom_domain, logo_version
          FROM colleges
          WHERE is_active AND (($1::text IS NOT NULL AND custom_domain = $1) OR ($2::text IS NOT NULL AND slug = $2))
          ORDER BY (custom_domain = $1::text) DESC NULLS LAST
