@@ -5,11 +5,22 @@ const pool = require('../config/db');
 const MAX_ATTEMPTS = 5;        // wrong guesses before a code is destroyed
 const RESEND_COOLDOWN_S = 60;  // minimum gap between codes for one email
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-});
-const MAIL_FROM = process.env.EMAIL_FROM || `"Competitive Leaderboard" <${process.env.EMAIL_USER}>`;
+// Mail transport. SMTP_HOST selects any SMTP server (a college's own mail server, Google Workspace,
+// Microsoft 365, SES, Brevo...); without it we use Gmail with EMAIL_USER / EMAIL_PASS (an App Password).
+// SMTP_USER / SMTP_PASS default to EMAIL_USER / EMAIL_PASS, and SMTP_SECURE defaults to true on port 465.
+const smtpPort = parseInt(process.env.SMTP_PORT, 10) || 587;
+const mailUser = process.env.SMTP_USER || process.env.EMAIL_USER;
+const mailPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+const auth = mailUser ? { user: mailUser, pass: mailPass } : undefined; // some internal relays need no login
+const transporter = process.env.SMTP_HOST
+    ? nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: smtpPort,
+        secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465,
+        auth,
+    })
+    : nodemailer.createTransport({ service: 'gmail', auth });
+const MAIL_FROM = process.env.EMAIL_FROM || `"Competitive Leaderboard" <${mailUser}>`;
 
 // Generates, stores and emails an OTP.
 // Returns { sent: true } or { sent: false, retryAfter } when still in cooldown.

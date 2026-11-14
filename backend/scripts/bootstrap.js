@@ -30,7 +30,7 @@ async function main() {
         ? { college_id: inserted.rows[0].college_id, created: true }
         : { college_id: (await pool.query('SELECT college_id FROM colleges WHERE slug = $1', [slug.value])).rows[0].college_id, created: false };
     console.log(college.created
-        ? `bootstrap: created college "${name}" (${slug.value}) at ${collegeUrl(slug.value)}`
+        ? `bootstrap: created college "${name}" (${slug.value})${process.env.ROOT_DOMAIN ? ` at ${collegeUrl(slug.value)}` : ''}`
         : `bootstrap: college "${slug.value}" already exists, leaving it as is`);
     if (college.created && domains.value.length === 0) console.log('bootstrap: WARNING no BOOTSTRAP_EMAIL_DOMAINS set, so registration is open to any email');
 
