@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch cancels the run it makes obsolete
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (migrations, boot, worker)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:ci@localhost:5432/ci
+      DATABASE_SSL: "false"
+      JWT_SECRET: ci-only-secret
+      PORT: "5000"
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Apply every migration to an empty database
+        run: npm run migrate
+      - name: Migrations are safe to run again
+        run: npm run migrate
+      - name: Server boots and resolves tenants against the database
+        run: |
+          node src/index.js &
+          for i in $(seq 1 20); do curl -fs localhost:5000/ >/dev/null && break; sleep 1; done
+          curl -fs localhost:5000/ | grep -q "running"
+          # no college exists yet, so this must be a clean JSON 404 (proves the DB query path works)
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:5000/college -H 'X-College-Slug: nope')" = "404"
+      - name: Worker runs a sync on an empty database and exits cleanly
+        run: node src/worker.js
+
+  frontend:
+    name: Frontend (lint, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+        env:
+          API_INTERNAL_URL: http://localhost:5000
+
+  docker:
+    name: Docker images and self-host package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Images build
+        run: |
+          docker build -t cpl-backend ./backend
+          docker build -t cpl-frontend ./frontend
+      - name: Compose files are valid
+        run: |
+          export POSTGRES_PASSWORD=x JWT_SECRET=x COLLEGE_NAME=CI COLLEGE_ADMIN_EMAIL=ci@example.com
+          docker compose config -q
+          docker compose -f selfhost/docker-compose.yml config -q
+      - name: Self-host package generates and is internally consistent
+        run: |
+          pkg="$RUNNER_TEMP/pkg"
+          scripts/package-selfhost.sh "$pkg"
+          test -f "$pkg/LICENSE" -a -f "$pkg/setup.sh" -a -f "$pkg/docker-compose.yml"
+          diff -r backend/migrations "$pkg/backend/migrations"
+          bash -n "$pkg/setup.sh" && bash -n "$pkg/backup.sh"
+          (cd "$pkg" && docker compose config -q)
