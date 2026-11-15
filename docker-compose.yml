@@ -33,6 +33,7 @@ services:
       EMAIL_FROM: ${EMAIL_FROM:-}
       APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
       SYNC_CRON: ${SYNC_CRON:-0 * * * *}
+      SYNC_STALE_HOURS: ${SYNC_STALE_HOURS:-3}
       # which college(s) this serves
       DEFAULT_COLLEGE_SLUG: ${COLLEGE_SLUG:-}
       ROOT_DOMAIN: ${ROOT_DOMAIN:-}

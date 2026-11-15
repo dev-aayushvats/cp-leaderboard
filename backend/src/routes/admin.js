@@ -23,6 +23,23 @@ const targetUser = (req, res, next) => {
     next();
 };
 
+// Is the rating sync actually running? Derived from what the worker leaves behind in platform_stats, so it
+// works the same for a hosted platform and a self-hosted one, with no extra moving part to break.
+//   none      no handles are linked yet, nothing to sync
+//   waiting   handles are linked but no sync has ever completed
+//   stale     the last successful sync is older than SYNC_STALE_HOURS (default 3; the worker runs hourly)
+//   degraded  at least half of the handles failed their latest attempt (a platform is down or blocking us)
+//   ok
+const STALE_HOURS = Math.max(1, Number(process.env.SYNC_STALE_HOURS) || 3);
+function syncHealth({ tracked, failed_last_run, last_synced_at }) {
+    let status = 'ok';
+    if (tracked === 0) status = 'none';
+    else if (!last_synced_at) status = 'waiting';
+    else if (Date.now() - new Date(last_synced_at).getTime() > STALE_HOURS * 3600 * 1000) status = 'stale';
+    else if (failed_last_run * 2 >= tracked) status = 'degraded';
+    return { status, stale_after_hours: STALE_HOURS };
+}
+
 // --- Overview ---
 router.get('/admin/stats', async (req, res) => {
     try {
@@ -46,11 +63,13 @@ router.get('/admin/stats', async (req, res) => {
                         COUNT(*) FILTER (WHERE p.sync_failures >= 3)::int AS failing,
                         COUNT(*) FILTER (WHERE p.last_sync_error_kind = 'not_found')::int AS not_found,
                         -- a handle can be both; 'issues' counts each problem handle once
-                        COUNT(*) FILTER (WHERE p.sync_failures >= 3 OR p.last_sync_error_kind = 'not_found')::int AS issues
+                        COUNT(*) FILTER (WHERE p.sync_failures >= 3 OR p.last_sync_error_kind = 'not_found')::int AS issues,
+                        COUNT(*)::int AS tracked,
+                        COUNT(*) FILTER (WHERE p.sync_failures >= 1)::int AS failed_last_run
                  FROM platform_stats p JOIN users u ON u.user_id = p.user_id
                  WHERE u.college_id = $1 AND u.is_active AND p.platform_name <> ALL($2::text[])`, [collegeId, disabledOf(req.college)]),
         ]);
-        res.json({ members: members.rows[0], platforms: platformStats.rows, sync: sync.rows[0] });
+        res.json({ members: members.rows[0], platforms: platformStats.rows, sync: { ...sync.rows[0], ...syncHealth(sync.rows[0]) } });
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Server Error' });

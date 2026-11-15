@@ -37,6 +37,7 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
       SYNC_CRON: ${SYNC_CRON:-0 * * * *}
+      SYNC_STALE_HOURS: ${SYNC_STALE_HOURS:-3}
       # One college. It is created on first start and never overwritten afterwards.
       DEFAULT_COLLEGE_SLUG: ${COLLEGE_SLUG:-college}
       BOOTSTRAP_COLLEGE_SLUG: ${COLLEGE_SLUG:-college}
