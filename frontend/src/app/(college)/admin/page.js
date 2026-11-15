@@ -80,6 +80,28 @@ const csvCell = (v) => {
   return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 };
 
+// Warns when ratings are not refreshing. Says nothing while everything is fine.
+function SyncBanner({ sync }) {
+  if (!sync || sync.status === "ok" || sync.status === "none") return null;
+  const ago = sync.last_synced_at ? timeAgo(sync.last_synced_at) : null;
+  const copy = {
+    waiting: ["Waiting for the first rating sync", "Handles are linked but no sync has completed yet. It runs automatically every hour; if this stays for long, check that the worker is running."],
+    stale: [`Ratings haven't refreshed in a while (last sync ${ago})`, "The sync worker may have stopped. Leaderboards are showing old numbers. Self-hosting? Check that the worker container is running (docker compose logs worker)."],
+    degraded: ["Most handles failed their latest sync", `LeetCode, Codeforces or AtCoder may be down or rate-limiting this server. It retries every hour${ago ? `; the last success was ${ago}` : ""}.`],
+  }[sync.status];
+  if (!copy) return null;
+  const severe = sync.status !== "waiting";
+  return (
+    <div role="status" className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-xs ${severe ? "bg-orange-500/10 border-orange-500/30 text-orange-200" : "bg-white/5 border-white/10 text-gray-300"}`}>
+      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+      <div>
+        <p className="font-bold">{copy[0]}</p>
+        <p className="mt-0.5 opacity-80">{copy[1]}</p>
+      </div>
+    </div>
+  );
+}
+
 // One linked handle in the members table: verified badge, and a warning if syncing it keeps failing.
 function Handle({ info }) {
   if (!info) return <span className="text-gray-600">-</span>;
@@ -553,6 +575,8 @@ export default function AdminPage() {
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-lg px-4 py-3" role="alert">{error}</div>
         )}
+
+        <SyncBanner sync={stats?.sync} />
 
         <ShareCard college={college} />
 
